@@ -1,0 +1,17 @@
+[
+  {
+	"name": "${name}",
+	"modid": "${id}",
+	"version": "${version}",
+	"mcversion": "1.12.2",
+	"description": "§l${name}§r\\n\\n§l${name}§r is a fork of the popular Vic's Modern Warfare Mod which is now discontinued aiming to improve and expand upon the experience.",
+	"authorList": [
+	  "Cubed-Development",
+	  "Red Studio"
+	],
+	"credits": "Luna Mira Lage (Desoroxxx), SticksDev, strubium, Paneedah, Braiam23, Koud-Wind, yor42, Azurae, moddingforreal, 333mhz, tyranobast, Nogard-00, jbredwards, AhmedKrm, skystorage, AnasDevO, BurnhamR, Medico, papudinho, .StarKnight, Vic4Games, Vic4GamesTeam",
+	"url": "https://github.com/Cubed-Development/Modern-Warfare-Cubed",
+	"updateJSON": "https://forge.curseupdate.com/836353/${id}",
+	"logoFile": "logo.png"
+  }
+]

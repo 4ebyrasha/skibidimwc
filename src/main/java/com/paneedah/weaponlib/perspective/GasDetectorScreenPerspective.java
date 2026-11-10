@@ -1,0 +1,37 @@
+package com.paneedah.weaponlib.perspective;
+
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+
+import static com.paneedah.mwc.proxies.ClientProxy.MC;
+
+public class GasDetectorScreenPerspective extends ScreenPerspective {
+
+    @Override
+    protected void drawScreen() {
+        float fontScale = 11f;
+        FontRenderer fontRender = MC.fontRenderer;
+        int color = 0xAAAA07;
+
+        GlStateManager.scale(fontScale, fontScale, fontScale);
+
+        String message = getMessage();
+        fontRender.drawString(message, 5 + (int) (10f / fontScale), 5 + (int) ((10f) / fontScale), color, false);
+    }
+
+    private String getMessage() {
+        float dose = 0f;
+        ItemStack itemStack = MC.player.getHeldItemMainhand();
+        NBTTagCompound nbt = itemStack.getTagCompound();
+        if (nbt != null) {
+            dose = nbt.getFloat("dose");
+        }
+        String message = String.format("%5.3f", dose);
+        if (message.length() > 6) {
+            message = message.substring(0, 6);
+        }
+        return message;
+    }
+}

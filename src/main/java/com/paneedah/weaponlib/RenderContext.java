@@ -1,0 +1,91 @@
+package com.paneedah.weaponlib;
+
+import com.paneedah.mwc.MWC;
+import com.paneedah.mwc.instancing.PlayerItemInstance;
+import com.paneedah.mwc.instancing.PlayerWeaponInstance;
+import com.paneedah.weaponlib.animation.MatrixHelper;
+import com.paneedah.weaponlib.animation.PartPositionProvider;
+import lombok.Getter;
+import lombok.Setter;
+import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import org.lwjgl.util.vector.Matrix4f;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class RenderContext<RS> implements PartPositionProvider {
+
+    @Getter private EntityLivingBase player;
+    private ItemStack itemStack;
+    @Getter @Setter private float limbSwing;
+    @Getter @Setter private float flimbSwingAmount;
+    @Getter @Setter private float ageInTicks;
+    @Getter @Setter private float netHeadYaw;
+    @Getter @Setter private float headPitch;
+    @Getter @Setter private float scale;
+    @Getter @Setter private float transitionProgress;
+    @Getter private ItemCameraTransforms.TransformType transformType;
+    @Getter @Setter private RS fromState;
+    @Getter @Setter private RS toState;
+    @Getter @Setter private PlayerItemInstance<?> playerItemInstance;
+    private boolean cancelBeizer;
+
+    private final Map<Part, Matrix4f> attachablePartPositions;
+
+    public RenderContext(EntityLivingBase player, ItemStack itemStack) {
+        this.player = player;
+        this.itemStack = itemStack;
+        this.attachablePartPositions = new HashMap<>();
+    }
+
+    public void setCancelBeizer() {
+        cancelBeizer = true;
+    }
+
+    public boolean getCancelBeizer() {
+        return cancelBeizer;
+    }
+
+    public void setPlayer(EntityPlayer player) {
+        this.player = player;
+    }
+
+    public void setWeapon(ItemStack weapon) {
+        this.itemStack = weapon;
+    }
+
+    public ItemStack getWeapon() {
+        return itemStack;
+    }
+
+    public void setCompatibleTransformType(ItemCameraTransforms.TransformType transformType) {
+        this.transformType = transformType;
+    }
+
+    public PlayerWeaponInstance getWeaponInstance() {
+        if (playerItemInstance instanceof PlayerWeaponInstance) {
+            return (PlayerWeaponInstance) playerItemInstance;
+        }
+        PlayerItemInstance<?> itemInstance = MWC.modContext.getPlayerItemInstanceRegistry()
+                .getCachedItemInstance(player, itemStack);
+        if (itemInstance instanceof PlayerWeaponInstance) {
+            return (PlayerWeaponInstance) itemInstance;
+        }
+        return null;
+    }
+
+    public void capturePartPosition(Part part) {
+        attachablePartPositions.put(part, MatrixHelper.captureMatrix());
+    }
+
+    @Override
+    public Matrix4f getPartPosition(Object part) {
+        if (part == null) {
+            part = Part.MAIN_ITEM;
+        }
+        return attachablePartPositions.get(part);
+    }
+}

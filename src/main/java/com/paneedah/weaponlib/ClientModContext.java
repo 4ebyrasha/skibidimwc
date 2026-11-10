@@ -1,0 +1,191 @@
+package com.paneedah.weaponlib;
+
+import com.paneedah.mwc.instancing.PlayerWeaponInstance;
+import com.paneedah.weaponlib.animation.player.screenshake.ScreenShakingAnimationManager;
+import com.paneedah.weaponlib.command.DebugCommand;
+import com.paneedah.weaponlib.command.MainCommand;
+import com.paneedah.weaponlib.compatibility.CompatibleRenderingRegistry;
+import com.paneedah.weaponlib.crafting.ammopress.GUIContainerAmmoPress;
+import com.paneedah.weaponlib.crafting.workbench.GUIContainerWorkbench;
+import com.paneedah.weaponlib.electronics.EntityWirelessCamera;
+import com.paneedah.weaponlib.electronics.WirelessCameraRenderer;
+import com.paneedah.weaponlib.grenade.*;
+import com.paneedah.mwc.gui.inventory.InventoryTabHandler;
+import com.paneedah.weaponlib.melee.ItemMelee;
+import com.paneedah.weaponlib.melee.MeleeRenderer;
+import com.paneedah.weaponlib.melee.PlayerMeleeInstance;
+import com.paneedah.weaponlib.perspective.PerspectiveManager;
+import lombok.Getter;
+import net.minecraft.client.shader.Framebuffer;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.client.ClientCommandHandler;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.paneedah.mwc.proxies.ClientProxy.MC;
+
+public class ClientModContext extends CommonModContext {
+
+    protected static ClientModContext currentContext;
+    private ClientEventHandler clientEventHandler;
+    private CompatibleRenderingRegistry rendererRegistry;
+
+    @Getter private PerspectiveManager viewManager;
+
+    private float aspectRatio;
+    private Framebuffer inventoryFramebuffer;
+
+    @Getter private Map<Object, Integer> inventoryTextureMap;
+
+    private EffectManager effectManager;
+
+    @Getter private ScreenShakingAnimationManager playerRawPitchAnimationManager;
+
+    public static ClientModContext getContext() {
+        return currentContext;
+    }
+
+    @Override
+    public void preInit(Object mod) {
+        super.preInit(mod);
+
+        currentContext = new ClientModContext();
+
+        aspectRatio = (float) MC.displayWidth / MC.displayHeight;
+
+        ClientCommandHandler.instance.registerCommand(new DebugCommand());
+
+        ClientCommandHandler.instance.registerCommand(new MainCommand());
+
+        rendererRegistry = new CompatibleRenderingRegistry();
+
+        rendererRegistry.preInit();
+
+        MinecraftForge.EVENT_BUS.register(new WeaponEventHandler(this));
+
+        KeyBindings.init();
+
+        clientEventHandler = new ClientEventHandler(this);
+        MinecraftForge.EVENT_BUS.register(clientEventHandler);
+
+        MinecraftForge.EVENT_BUS.register(InventoryTabHandler.getInstance());
+
+
+        MinecraftForge.EVENT_BUS.register(clientEventHandler); // TODO: what are the implications of registering the same class with 2 buses
+
+        this.viewManager = new PerspectiveManager(this);
+        this.inventoryTextureMap = new HashMap<>();
+
+        this.effectManager = new ClientEffectManager();
+
+        this.playerRawPitchAnimationManager = new ScreenShakingAnimationManager();
+
+        GUIContainerWorkbench.setModContext(this);
+        GUIContainerAmmoPress.setModContext(this);
+    }
+
+    @Override
+    public void init(Object mod) {
+        super.init(mod);
+
+        rendererRegistry.registerEntityRenderingHandler(WeaponSpawnEntity.class, new SpawnEntityRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntityWirelessCamera.class, new WirelessCameraRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntityShellCasing.class, new ShellCasingRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntityGrenade.class, new EntityGrenadeRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntitySmokeGrenade.class, new EntityGrenadeRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntityGasGrenade.class, new EntityGrenadeRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntityFlashGrenade.class, new EntityGrenadeRenderer());
+        rendererRegistry.registerEntityRenderingHandler(EntitySpreadable.class, new InvisibleEntityRenderer());
+        //rendererRegistry.registerEntityRenderingHandler(EntityVehicle.class, new RenderVehicle());
+
+        rendererRegistry.processDelayedRegistrations();
+    }
+
+    @Override
+    public boolean isClient() {
+        return true;
+    }
+
+    @Override
+    public void registerWeapon(String name, Weapon weapon, WeaponRenderer renderer) {
+        super.registerWeapon(name, weapon, renderer);
+        rendererRegistry.register(weapon, weapon.getName(), weapon.getRenderer());
+        renderer.setClientModContext(this);
+    }
+
+    @Override
+    public void registerRenderableItem(String name, Item item, Object renderer) {
+        super.registerRenderableItem(name, item, renderer);
+        rendererRegistry.register(item, name, renderer);
+    }
+
+    @Override
+    public void registerRenderableItem(ResourceLocation name, Item item, Object renderer) {
+        super.registerRenderableItem(name, item, renderer);
+        rendererRegistry.register(item, name, renderer);
+    }
+
+    @Override
+    protected EntityPlayer getPlayer(MessageContext ctx) {
+        return MC.player;
+    }
+
+    protected SyncManager<?> getSyncManager() {
+        return syncManager;
+    }
+
+    @Override
+    public PlayerWeaponInstance getMainHeldWeapon() {
+        return getPlayerItemInstanceRegistry().getMainHandItemInstance(MC.player,
+                PlayerWeaponInstance.class);
+    }
+
+    public PlayerMeleeInstance getMainHeldMeleeWeapon() {
+        return getPlayerItemInstanceRegistry().getMainHandItemInstance(MC.player,
+                PlayerMeleeInstance.class);
+    }
+
+    @Override
+    public void registerMeleeWeapon(String name, ItemMelee itemMelee, MeleeRenderer renderer) {
+        super.registerMeleeWeapon(name, itemMelee, renderer);
+        rendererRegistry.register(itemMelee, itemMelee.getName(), itemMelee.getRenderer());
+        renderer.setClientModContext(this);
+    }
+
+    @Override
+    public void registerGrenadeWeapon(String name, ItemGrenade itemGrenade, GrenadeRenderer renderer) {
+        super.registerGrenadeWeapon(name, itemGrenade, renderer);
+        rendererRegistry.register(itemGrenade, itemGrenade.getName(), itemGrenade.getRenderer());
+        renderer.setClientModContext(this);
+    }
+
+    @Override
+    public float getAspectRatio() {
+        return aspectRatio;
+    }
+
+    public Framebuffer getInventoryFramebuffer() {
+        if (inventoryFramebuffer == null) {
+            inventoryFramebuffer = new Framebuffer(256, 256, true);
+            inventoryFramebuffer.setFramebufferColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return inventoryFramebuffer;
+    }
+
+    @Override
+    public EffectManager getEffectManager() {
+        return effectManager;
+    }
+
+    @Override
+    public void registerRenderableEntity(Class<? extends Entity> entityClass, Object renderer) {
+        rendererRegistry.registerEntityRenderingHandler(entityClass, renderer);
+    }
+
+}

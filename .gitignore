@@ -1,0 +1,28 @@
+# Ignore everything
+*
+
+# Allow root files
+!/.gitignore
+!/.gitattributes
+!/LICENSE
+!/README.md
+!/build.gradle
+!/gradle.properties
+!/settings.gradle
+!/gradlew
+!/gradlew.bat
+!/gradle/
+
+# Allow Gradle wrapper
+!/gradle/wrapper/
+!/gradle/wrapper/**
+
+# Allow source code
+!/src/
+!/src/**
+
+# Ignore build output
+/build/
+/.gradle/
+/.idea/
+/libs/

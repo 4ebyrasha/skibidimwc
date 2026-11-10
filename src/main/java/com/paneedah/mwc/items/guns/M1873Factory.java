@@ -1,0 +1,927 @@
+package com.paneedah.mwc.items.guns;
+
+import com.paneedah.mwc.MWC;
+import com.paneedah.mwc.models.*;
+import com.paneedah.mwc.proxies.CommonProxy;
+import com.paneedah.mwc.weapons.*;
+import com.paneedah.weaponlib.*;
+import com.paneedah.weaponlib.animation.Transition;
+import com.paneedah.weaponlib.config.BalancePackManager.GunConfigurationGroup;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.item.Item;
+
+public class M1873Factory implements GunFactory {
+
+    public Item createGun(CommonProxy commonProxy) {
+        return new Weapon.Builder()
+
+                .withName("M1873")
+//      .withCapacity(CommonProxy.Remington870Mag)
+                .withAmmoCapacity(7)
+                .withMaxBulletsPerReload(7)
+                .withFireRate(0.5f)
+                .withEjectRoundRequired()
+                .withIteratedLoad()
+                .withEjectSpentRoundSound("m1873action")
+                .withFireRate(0.1f)
+                .withRecoil(9f)
+                .withZoom(0.9f)
+                .withConfigGroup(GunConfigurationGroup.RIFLE)
+                .withMaxShots(1)
+                .withPumpTimeout(800)
+                .withShootSound("m1873")
+                .withReloadSound("drawweapon")
+                .withReloadIterationSound("loadbullet")
+                .withDrawSound("noaction_draw")
+                .withAllReloadIterationsCompletedSound("drawweapon")
+                .withReloadingTime(15)
+                .withShellCasingEjectEnabled(false)
+                .withFlashIntensity(0.4f)
+                .withFlashScale(() -> 0.5f)
+                .withFlashOffsetX(() -> 0.11f)
+                .withFlashOffsetY(() -> 0.06f)
+                .withCreativeTab(MWC.WEAPONS_TAB)
+
+
+                .withScreenShaking(RenderableState.SHOOTING,
+                        3f, // x
+                        0.1f, // y
+                        3f) // z
+
+                .withCompatibleAttachment(AuxiliaryAttachments.Extra, true, (model) -> {
+                    if (model instanceof AKMiron1) {
+                        GlStateManager.translate(0.125F, -1.8F, -0.5F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof AKMiron2) {
+                        GlStateManager.translate(-0.14F, -0.47F, -4.45F);
+                        GlStateManager.rotate(-180f, 1f, 0f, 0f);
+                        GlStateManager.scale(0.4F, 0.5F, 1F);
+                    } else if (model instanceof AK47iron) {
+                        GlStateManager.translate(-0.165F, -0.8F, -1.1F);
+                        GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                    } else if (model instanceof M4Iron1) {
+                        GlStateManager.translate(0.155F, -1.74F, 1F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof M4Iron2) {
+                        GlStateManager.translate(0.26F, -1.55F, -2.35F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof P90iron) {
+                        GlStateManager.translate(0.26F, -1.55F, -2.35F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof G36CIron1) {
+                        GlStateManager.translate(-0.22F, -1.94F, 0.13F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof G36CIron2) {
+                        GlStateManager.translate(-0.205F, -1.9F, -3.15F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof ScarIron1) {
+                        GlStateManager.translate(0.165F, -1.65F, 1F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof ScarIron2) {
+                        GlStateManager.translate(0.25F, -1.55F, -2F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof FALIron) {
+                        GlStateManager.translate(0.129F, -1.63F, -2.08F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof M14Iron) {
+                        GlStateManager.translate(0.129F, -1.63F, -2.08F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof MP5Iron) {
+                        GlStateManager.translate(0.215F, -1.54F, 1.2F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    }
+                })
+                .withCompatibleAttachment(AuxiliaryAttachments.M1873action, true, (model) -> {
+//            GlStateManager.rotate(-50f, 1f, 0f, 0f);
+//            GlStateManager.translate(0f, -0.43f, -0.5f);
+                })
+                .withCompatibleBullet(Bullets.Bullet4440, (model) -> {})
+                .withTextureNames("M1873")
+                .withRenderer(new WeaponRenderer.Builder()
+
+                        .withModel(new M1873Talon())
+                        //.withTextureName("Remington900")
+                        //.withWeaponProximity(0.99F)
+                        //.withYOffsetZoom(5F)
+                        .withEntityPositioning(itemStack -> {
+                            GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                            GlStateManager.rotate(-90F, 0f, 0f, 4f);
+                        })
+                        .withInventoryPositioning(itemStack -> {
+                            GlStateManager.scale(0.35F, 0.35F, 0.35F);
+                            GlStateManager.translate(1, 0.8f, 0);
+                            GlStateManager.rotate(-120F, -0.5f, 7f, 3f);
+                        })
+                        .withThirdPersonPositioning((renderContext) -> {
+                            GlStateManager.scale(0.6F, 0.6F, 0.6F);
+                            GlStateManager.translate(-0.9F, 0.4F, 1F);
+                            GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                            GlStateManager.rotate(70F, 1f, 0f, 0f);
+                        })
+
+                        .withFirstPersonPositioningLoadIterationCompleted((renderContext) -> {
+                            GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                            GlStateManager.rotate(5.000000f, 1f, 0f, 0f);
+                            GlStateManager.rotate(30.000000f, 0f, 1f, 0f);
+                            GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                            GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                        })
+
+                        .withFirstPersonPositioning((renderContext) -> {
+                            GlStateManager.rotate(45F, 0f, 1f, 0f);
+                            GlStateManager.rotate(4F, 0f, 0f, 1f);
+                            GlStateManager.scale(3.000000f, 3.000000f, 3.000000f);
+                            GlStateManager.translate(-0.275000f, 0.300000f, -1.100000f);
+                        })
+
+                        .withFirstPersonPositioningRecoiled((renderContext) -> {
+                            GlStateManager.rotate(45F, 0f, 1f, 0f);
+                            GlStateManager.rotate(4F, 0f, 0f, 1f);
+                            GlStateManager.scale(3.000000f, 3.000000f, 3.000000f);
+                            GlStateManager.translate(-0.275000f, 0.300000f, -0.9f);
+                            GlStateManager.rotate(-1F, 1f, 0f, 0f);
+                        })
+
+                        .withFirstPersonPositioningZoomingRecoiled((renderContext) -> {
+                            GlStateManager.rotate(45F, 0f, 1f, 0f);
+                            GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                            GlStateManager.translate(0.250000f, 0.17f, -1f);
+                            GlStateManager.rotate(-0.5F, 1f, 0f, 0f);
+
+//              // Holo Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.PSO1)) {
+                                //System.out.println("Position me for Holo");
+                            }
+
+                            // Everything else
+                            else {
+                            }
+
+
+                        })
+
+                        .withFirstPersonCustomPositioning(AuxiliaryAttachments.M1873action.getRenderablePart(), (renderContext) -> {
+                        })
+
+                        .withFirstPersonCustomPositioningLoadIterationCompleted(AuxiliaryAttachments.M1873action.getRenderablePart(), (renderContext) -> {
+                        })
+
+                        .withFirstPersonPositioningEjectSpentRound(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(0.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(30.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(80.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.18f, 0.625000f, -1.4f);
+                                }, 230, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(-3.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(18.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(80.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.18f, 0.625000f, -1.3f);
+                                }, 180, 20),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(-1.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(26.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(76.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.18f, 0.625000f, -1.4f);
+                                }, 150, 0)
+
+                        )
+
+                        .withFirstPersonCustomPositioningEjectSpentRound(AuxiliaryAttachments.M1873action.getRenderablePart(),
+                                new Transition((renderContext) -> { // Reload position
+
+                                }, 170, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(-50f, 1f, 0f, 0f);
+                                    GlStateManager.translate(0f, -0.43f, -0.5f);
+                                }, 150, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 150, 50)
+
+                        )
+
+                        .withFirstPersonPositioningEjectSpentRoundAimed(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(44F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-1F, 1f, 0f, 0f);
+                                    GlStateManager.rotate(2F, 0f, 0f, 1f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(0.250000f, 0.19f, -1.1f);
+                                }, 230, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(43F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-2F, 1f, 0f, 0f);
+                                    GlStateManager.rotate(10F, 0f, 0f, 1f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(0.250000f, 0.22f, -1f);
+                                }, 180, 20),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(43F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-1F, 1f, 0f, 0f);
+                                    GlStateManager.rotate(6F, 0f, 0f, 1f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(0.250000f, 0.2f, -1.05f);
+                                }, 150, 0)
+
+                        )
+
+                        .withFirstPersonCustomPositioningEjectSpentRoundAimed(AuxiliaryAttachments.M1873action.getRenderablePart(),
+                                new Transition((renderContext) -> { // Reload position
+
+                                }, 170, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(-50f, 1f, 0f, 0f);
+                                    GlStateManager.translate(0f, -0.43f, -0.5f);
+                                }, 150, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 150, 50)
+
+                        )
+
+                        .withFirstPersonCustomPositioningReloading(AuxiliaryAttachments.M1873action.getRenderablePart(),
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonCustomPositioningAllLoadIterationsCompleted(AuxiliaryAttachments.M1873action.getRenderablePart(),
+                                new Transition((renderContext) -> { // Reload position\
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonCustomPositioningLoadIteration(AuxiliaryAttachments.M1873action.getRenderablePart(),
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonPositioningReloading(
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(2.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                                }, 300, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(5.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(30.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                                }, 330, 0)
+                        )
+
+                        .withFirstPersonPositioningAllLoadIterationsCompleted(
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(7.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                                }, 230, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(5.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(35.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.26f, 0.58f, -1f);
+                                }, 190, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(2.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.28f, 0.58f, -1f);
+                                }, 200, 0)
+                        )
+
+                        .withFirstPersonPositioningLoadIteration(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(5.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(31.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                                }, 150, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(6.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(30.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                                }, 170, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(7.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(32.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(22.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.55f, -1.02f);
+                                }, 140, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(7.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(31.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(21.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.55f, -1.02f);
+                                }, 150, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.rotate(6.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(30.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.250000f, 0.525000f, -1.050000f);
+                                }, 140, 0)
+                        )
+
+                        .withFirstPersonPositioningInspecting(
+                                new Transition((renderContext) -> {
+                                    GlStateManager.scale(3.000000f, 3.000000f, 3.000000f);
+                                    GlStateManager.rotate(-5.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(5.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-15.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.475000f, 0.150000f, -0.950000f);
+                                }, 300, 600),
+                                new Transition((renderContext) -> {
+                                    GlStateManager.scale(3.000000f, 3.000000f, 3.000000f);
+                                    GlStateManager.rotate(-5.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(5.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(30.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.375000f, 0.700000f, -0.825000f);
+                                }, 350, 600)
+                        )
+
+                        .withFirstPersonPositioningDrawing(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(15F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(13F, 0f, 0f, 1f);
+                                    GlStateManager.rotate(9F, 1f, 0f, 0f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(-0.2f, 0.7f, -1.4f);
+                                }, 160, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(25F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(9F, 0f, 0f, 1f);
+                                    GlStateManager.rotate(6F, 1f, 0f, 0f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(-0.2f, 0.5f, -1.4f);
+                                }, 210, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(35F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(8F, 0f, 0f, 1f);
+                                    GlStateManager.rotate(4F, 1f, 0f, 0f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(-0.2f, 0.4f, -1.4f);
+                                }, 270, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.rotate(43F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(8F, 0f, 0f, 1f);
+                                    GlStateManager.rotate(-2F, 1f, 0f, 0f);
+                                    GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                                    GlStateManager.translate(-0.2f, 0.45f, -1.4f);
+                                }, 240, 0)
+                        )
+
+                        .withFirstPersonPositioningZooming((renderContext) -> {
+                            GlStateManager.rotate(45F, 0f, 1f, 0f);
+                            GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                            GlStateManager.translate(0.250000f, 0.17f, -1.1f);
+
+//              // Holo Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.PSO1)) {
+                                //System.out.println("Position me for Holo");
+                            }
+
+                            // Everything else
+                            else {
+                            }
+
+
+                        })
+                        .withFirstPersonPositioningRunning((renderContext) -> {
+                            GlStateManager.scale(2f, 2f, 2f);
+                            GlStateManager.rotate(10.000000f, 1f, 0f, 0f);
+                            GlStateManager.rotate(-5.000000f, 0f, 1f, 0f);
+                            GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                            GlStateManager.translate(-0.350000f, 0.200000f, -0.400000f);
+                        })
+                        .withFirstPersonPositioningModifying((renderContext) -> {
+                            GlStateManager.scale(4.000000f, 4.000000f, 4.000000f);
+                            GlStateManager.rotate(5.000000f, 1f, 0f, 0f);
+                            GlStateManager.rotate(15.000000f, 0f, 1f, 0f);
+                            GlStateManager.rotate(-10.000000f, 0f, 0f, 1f);
+                            GlStateManager.translate(-0.5f, 0.05f, -1.324999f);
+                        })
+                        .withFirstPersonHandPositioning(
+                                (renderContext) -> {
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                },
+                                (renderContext) -> {
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+
+//                         GlStateManager.scale(3f, 3f, 3f);
+                                })
+
+                        .withFirstPersonHandPositioningLoadIterationCompleted(
+                                (renderContext) -> {
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                },
+                                (renderContext) -> {
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-105.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(58.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-82.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.650000f, 0.21f);
+                                })
+
+                        .withFirstPersonHandPositioningZooming(
+                                (renderContext) -> {
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                },
+                                (renderContext) -> {
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                })
+
+                        .withFirstPersonHandPositioningModifying(
+                                (renderContext) -> {
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                },
+                                (renderContext) -> {
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                })
+
+                        .withFirstPersonLeftHandPositioningReloading(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonRightHandPositioningReloading(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-105.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(58.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-82.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.650000f, 0.21f);
+                                }, 250, 1000),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-101.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(56.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-82.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.650000f, 0.21f);
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonLeftHandPositioningLoadIteration(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonRightHandPositioningLoadIteration(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(55.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-80.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.650000f, 0.200000f);
+                                }, 250, 1000),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-95.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-75.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.625000f, 0.175000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-95.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(35.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-75.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.550000f, 0.175000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-95.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-75.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.625000f, 0.175000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(55.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-80.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.650000f, 0.200000f);
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonLeftHandPositioningAllLoadIterationsCompleted(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.175000f, -0.450000f, 0.200000f);
+                                }, 250, 50)
+
+                        )
+
+                        .withFirstPersonRightHandPositioningAllLoadIterationsCompleted(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 1000),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50)
+                        )
+
+                        .withFirstPersonLeftHandPositioningEjectSpentRound(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-90.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-15.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.650000f, 0.250000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-90.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-15.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.650000f, 0.250000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-90.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-15.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.650000f, 0.250000f);
+                                }, 250, 50)
+
+                        )
+
+                        .withFirstPersonRightHandPositioningEjectSpentRound(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(70.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-125.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(90.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-35.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.425000f, -0.850000f, 0.200000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(70.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50)
+
+                        )
+
+                        .withFirstPersonLeftHandPositioningEjectSpentRoundAimed(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                }, 250, 50)
+
+                        )
+
+                        .withFirstPersonRightHandPositioningEjectSpentRoundAimed(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(70.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-125.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(90.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-35.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.425000f, -0.850000f, 0.200000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(70.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50)
+
+                        )
+
+                        .withFirstPersonLeftHandPositioningInspecting(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4.5f);
+                                    GlStateManager.rotate(-90.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(35.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.200000f, -0.400000f, 0.225000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4.5f);
+                                    GlStateManager.rotate(-90.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(35.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.200000f, -0.400000f, 0.225000f);
+                                }, 250, 50))
+
+                        .withFirstPersonRightHandPositioningInspecting(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50))
+
+                        .withFirstPersonLeftHandPositioningInspecting(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-50.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, -0.550000f, 0.225000f);
+                                }, 250, 50))
+
+                        .withFirstPersonRightHandPositioningInspecting(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 50))
+
+                        .withFirstPersonLeftHandPositioningDrawing(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-80.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-55.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(60.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.675000f, 0.125000f);
+                                }, 150, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-80.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-55.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(60.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.675000f, 0.125000f);
+                                }, 130, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-80.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-55.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(60.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.675000f, 0.125000f);
+                                }, 200, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(4f, 4f, 4f);
+                                    GlStateManager.rotate(-80.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-55.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(60.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.100000f, -0.675000f, 0.125000f);
+                                }, 200, 0)
+                        )
+
+                        .withFirstPersonRightHandPositioningDrawing(
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 150, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 130, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 100),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(3f, 3f, 3f);
+                                    GlStateManager.rotate(-85.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(25.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-65.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.575000f, -0.900000f, 0.150000f);
+                                }, 250, 100)
+                        )
+
+                        .build())
+                .withSpawnEntityDamage(5.5f)
+
+
+                .build(MWC.modContext);
+    }
+}

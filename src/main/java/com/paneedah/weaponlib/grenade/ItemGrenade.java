@@ -1,0 +1,502 @@
+package com.paneedah.weaponlib.grenade;
+
+import com.paneedah.mwc.instancing.PlayerGrenadeInstance;
+import com.paneedah.mwc.instancing.PlayerItemInstanceFactory;
+import com.paneedah.mwc.weapons.AbstractItemBuilder;
+import com.paneedah.weaponlib.RenderableState;
+import com.paneedah.weaponlib.*;
+import com.paneedah.weaponlib.crafting.*;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.SoundEvent;
+import net.minecraftforge.fml.common.registry.ForgeRegistries;
+import net.minecraftforge.oredict.ShapedOreRecipe;
+
+import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+import static com.paneedah.mwc.ProjectConstants.ID;
+
+public class ItemGrenade extends Item implements
+        PlayerItemInstanceFactory<PlayerGrenadeInstance, GrenadeState>, AttachmentContainer, Updatable, ICraftingRecipe {
+
+    public static final int DEFAULT_FUSE_TIMEOUT = 3000;
+    public static final float DEFAULT_EXPLOSION_STRENTH = 2f;
+    public static final int EXPLODE_ON_IMPACT = -1;
+
+    public static final float DEFAULT_GRAVITY_VELOCITY = 0.06f;
+    public static final float DEFAULT_FAR_VELOCITY = 1.3f;
+    public static final float DEFAULT_VELOCITY = 1.5f;
+    public static final float DEFAULT_ROTATION_SLOWDOWN_FACTOR = 0.99f;
+
+    public static final float DEFAULT_EFFECTIVE_RADIUS = 20f;
+    public static final float DEFAULT_FRAGMENT_DAMAGE = 15f;
+    public static final int DEFAULT_FRAGMENT_COUNT = 100;
+
+    private CraftingEntry[] modernRecipe;
+    private CraftingGroup craftGroup;
+
+    @Override
+    public CraftingEntry[] getCraftingRecipe() {
+        return this.modernRecipe;
+    }
+
+    @Override
+    public ItemStack getOutput() {
+        return new ItemStack(this);
+    }
+
+    @Override
+    public CraftingGroup getCraftingGroup() {
+        return this.craftGroup;
+    }
+
+    @Override
+    public void setCraftingRecipe(CraftingEntry[] craftingRecipe) {
+        this.modernRecipe = craftingRecipe;
+    }
+
+    @Override
+    public void setCraftingGroup(CraftingGroup group) {
+        this.craftGroup = group;
+    }
+
+    public enum Type {
+        REGULAR, SMOKE, GAS, FLASH
+    }
+
+    public static class Builder extends AbstractItemBuilder<Builder> {
+
+        protected String textureName;
+        protected Consumer<ItemStack> entityPositioning;
+        protected Consumer<ItemStack> inventoryPositioning;
+        protected BiConsumer<EntityLivingBase, ItemStack> thirdPersonPositioning;
+        protected BiConsumer<EntityLivingBase, ItemStack> firstPersonPositioning;
+        protected BiConsumer<ModelBase, ItemStack> firstPersonModelPositioning;
+        protected BiConsumer<ModelBase, ItemStack> thirdPersonModelPositioning;
+        protected BiConsumer<ModelBase, ItemStack> inventoryModelPositioning;
+        protected BiConsumer<ModelBase, ItemStack> entityModelPositioning;
+
+        protected Consumer<RenderContext<RenderableState>> firstPersonLeftHandPositioning;
+        protected Consumer<RenderContext<RenderableState>> firstPersonRightHandPositioning;
+
+        protected Map<ItemAttachment<ItemGrenade>, CompatibleAttachment<ItemGrenade>> compatibleAttachments = new HashMap<>();
+
+        private Supplier<Float> velocity = () -> DEFAULT_VELOCITY;
+        private Supplier<Float> farVelocity = () -> DEFAULT_FAR_VELOCITY;
+        private Supplier<Float> gravityVelocity = () -> DEFAULT_GRAVITY_VELOCITY;
+
+        private int explosionTimeout = DEFAULT_FUSE_TIMEOUT;
+        private float explosionStrength = DEFAULT_EXPLOSION_STRENTH;
+
+        private GrenadeRenderer renderer;
+        List<String> textureNames = new ArrayList<>();
+        private Supplier<Float> rotationSlowdownFactor = () -> DEFAULT_ROTATION_SLOWDOWN_FACTOR;
+
+        private String bounceHardSound;
+        private String bounceSoftSound;
+        private String explosionSound;
+        private String safetyPinOffSound;
+        private String stopAfterThrowingSound;
+        private String throwSound;
+        private float effectiveRadius = DEFAULT_EFFECTIVE_RADIUS;
+        private float fragmentDamage = DEFAULT_FRAGMENT_DAMAGE;
+        private int fragmentCount = DEFAULT_FRAGMENT_COUNT;
+
+        private Type type = Type.REGULAR;
+        private long activeDuration;
+        private Object[] craftingRecipe;
+        private boolean isDestroyingBlocks = true;
+        private CraftingEntry[] modernRecipe;
+        private CraftingGroup craftingGroup;
+
+
+        public Builder withTextureNames(String... textureNames) {
+            for (String textureName : textureNames) {
+                this.textureNames.add(textureName.toLowerCase() + ".png");
+            }
+            return this;
+        }
+
+        public Builder withCompatibleAttachment(ItemAttachment<ItemGrenade> attachment, BiConsumer<EntityLivingBase, ItemStack> positioning) {
+            compatibleAttachments.put(attachment, new CompatibleAttachment<>(attachment, positioning, null, true));
+            return this;
+        }
+
+        public Builder withVelocity(Supplier<Float> velocity) {
+            this.velocity = velocity;
+            return this;
+        }
+
+        public Builder withFarVelocity(Supplier<Float> farVelocity) {
+            this.farVelocity = farVelocity;
+            return this;
+        }
+
+        public Builder withGravityVelocity(Supplier<Float> gravityVelocity) {
+            this.gravityVelocity = gravityVelocity;
+            return this;
+        }
+
+        public Builder withRotationSlowdownFactor(Supplier<Float> rotationSlowdownFactor) {
+            this.rotationSlowdownFactor = rotationSlowdownFactor;
+            return this;
+        }
+
+        public Builder withExplosionStrength(float explosionStrength) {
+            this.explosionStrength = explosionStrength;
+            return this;
+        }
+
+        public Builder withExplosionTimeout(int explosionTimeout) {
+            this.explosionTimeout = explosionTimeout;
+            return this;
+        }
+
+        public Builder withExplosionOnImpact() {
+            this.explosionTimeout = EXPLODE_ON_IMPACT;
+            return this;
+        }
+
+        public Builder withDestroyingBlocks(boolean isDestroyingBlocks) {
+            this.isDestroyingBlocks = isDestroyingBlocks;
+            return this;
+        }
+
+        public Builder withType(Type type) {
+            this.type = type;
+            return this;
+        }
+
+        public Builder withEntityPositioning(Consumer<ItemStack> entityPositioning) {
+            this.entityPositioning = entityPositioning;
+            return this;
+        }
+
+        public Builder withInventoryPositioning(Consumer<ItemStack> inventoryPositioning) {
+            this.inventoryPositioning = inventoryPositioning;
+            return this;
+        }
+
+        public Builder withThirdPersonPositioning(BiConsumer<EntityLivingBase, ItemStack> thirdPersonPositioning) {
+            this.thirdPersonPositioning = thirdPersonPositioning;
+            return this;
+        }
+
+        public Builder withFirstPersonPositioning(BiConsumer<EntityLivingBase, ItemStack> firstPersonPositioning) {
+            this.firstPersonPositioning = firstPersonPositioning;
+            return this;
+        }
+
+        public Builder withFirstPersonModelPositioning(BiConsumer<ModelBase, ItemStack> firstPersonModelPositioning) {
+            this.firstPersonModelPositioning = firstPersonModelPositioning;
+            return this;
+        }
+
+        public Builder withEntityModelPositioning(BiConsumer<ModelBase, ItemStack> entityModelPositioning) {
+            this.entityModelPositioning = entityModelPositioning;
+            return this;
+        }
+
+        public Builder withInventoryModelPositioning(BiConsumer<ModelBase, ItemStack> inventoryModelPositioning) {
+            this.inventoryModelPositioning = inventoryModelPositioning;
+            return this;
+        }
+
+        public Builder withThirdPersonModelPositioning(BiConsumer<ModelBase, ItemStack> thirdPersonModelPositioning) {
+            this.thirdPersonModelPositioning = thirdPersonModelPositioning;
+            return this;
+        }
+
+        public Builder withFirstPersonHandPositioning(
+                Consumer<RenderContext<RenderableState>> leftHand,
+                Consumer<RenderContext<RenderableState>> rightHand) {
+            this.firstPersonLeftHandPositioning = leftHand;
+            this.firstPersonRightHandPositioning = rightHand;
+            return this;
+        }
+
+        public Builder withRenderer(GrenadeRenderer renderer) {
+            this.renderer = renderer;
+            return this;
+        }
+
+        public Builder withModernRecipe(CraftingGroup group, CraftingEntry... is) {
+            this.modernRecipe = is;
+            this.craftingGroup = group;
+            return this;
+        }
+
+        public Builder withCraftingRecipe(Object... craftingRecipe) {
+            this.craftingRecipe = craftingRecipe;
+            return this;
+        }
+
+        public Builder withBounceHardSound(String sound) {
+            this.bounceHardSound = sound != null ? sound.toLowerCase() : null;
+            return this;
+        }
+
+        public Builder withBounceSoftSound(String sound) {
+            this.bounceSoftSound = sound != null ? sound.toLowerCase() : null;
+            return this;
+        }
+
+        public Builder withExplosionSound(String sound) {
+            this.explosionSound = sound != null ? sound.toLowerCase() : null;
+            return this;
+        }
+
+        public Builder withSafetyPinOffSound(String sound) {
+            this.safetyPinOffSound = sound != null ? sound.toLowerCase() : null;
+            return this;
+        }
+
+        public Builder withThrowSound(String sound) {
+            this.throwSound = sound != null ? sound.toLowerCase() : null;
+            return this;
+        }
+
+        public Builder withStopAfterThrowingSound(String sound) {
+            this.stopAfterThrowingSound = sound != null ? sound.toLowerCase() : null;
+            return this;
+        }
+
+        public Builder withEffectiveRadius(float effectiveRadius) {
+            this.effectiveRadius = effectiveRadius;
+            return this;
+        }
+
+        public Builder withFragmentDamage(float fragmentDamage) {
+            this.fragmentDamage = fragmentDamage;
+            return this;
+        }
+
+        public Builder withFragmentCount(int fragmentCount) {
+            this.fragmentCount = fragmentCount;
+            return this;
+        }
+
+        public Builder withActiveDuration(long duration) {
+            this.activeDuration = duration;
+            return this;
+        }
+
+        @Override
+        public ItemGrenade build(ModContext modContext) {
+            ItemGrenade grenade = new ItemGrenade(this, modContext);
+            grenade.setTranslationKey(ID + "_" + name);
+            grenade.setCreativeTab(tab);
+            grenade.maxStackSize = maxStackSize;
+
+            grenade.setCraftingGroup(craftingGroup);
+            grenade.setCraftingRecipe(modernRecipe);
+
+            CraftingRegistry.registerHook(grenade);
+
+            if (this.bounceHardSound != null) {
+                grenade.bounceHardSound = modContext.registerSound(this.bounceHardSound);
+            }
+
+            if (this.bounceSoftSound != null) {
+                grenade.bounceSoftSound = modContext.registerSound(this.bounceSoftSound);
+            }
+
+            if (this.explosionSound != null) {
+                grenade.explosionSound = modContext.registerSound(this.explosionSound);
+            }
+
+            if (this.safetyPinOffSound != null) {
+                grenade.safetyPinOffSound = modContext.registerSound(this.safetyPinOffSound);
+            }
+
+            if (this.throwSound != null) {
+                grenade.throwSound = modContext.registerSound(this.throwSound);
+            }
+
+            if (this.stopAfterThrowingSound != null) {
+                grenade.stopAfterThrowingSound = modContext.registerSound(this.stopAfterThrowingSound);
+            }
+
+            modContext.registerGrenadeWeapon(name, grenade, renderer);
+
+            if (craftingRecipe != null && craftingRecipe.length >= 2) {
+                modContext.getRecipeManager().registerShapedRecipe(grenade, craftingRecipe);
+            }
+
+            return grenade;
+        }
+    }
+
+    Builder builder;
+    private final ModContext modContext;
+    private SoundEvent bounceHardSound;
+    private SoundEvent bounceSoftSound;
+    private SoundEvent explosionSound;
+    private SoundEvent safetyPinOffSound;
+    private SoundEvent throwSound;
+    private SoundEvent stopAfterThrowingSound;
+
+    public ItemGrenade(Builder builder, ModContext modContext) {
+        this.builder = builder;
+        this.modContext = modContext;
+        this.maxStackSize = 16;
+    }
+
+
+    public GrenadeRenderer getRenderer() {
+        return builder.renderer;
+    }
+
+    public String getTextureName() {
+        return builder.textureNames.get(0);
+    }
+
+    public boolean hasSafetyPin() {
+        return builder.explosionTimeout > 0;
+    }
+
+    public List<CompatibleAttachment<? extends AttachmentContainer>> getActiveAttachments(EntityLivingBase player,
+                                                                                          ItemStack itemStack) {
+        return new ArrayList<>(builder.compatibleAttachments.values());
+    }
+
+    Map<ItemAttachment<ItemGrenade>, CompatibleAttachment<ItemGrenade>> getCompatibleAttachments() {
+        return builder.compatibleAttachments;
+    }
+
+    public String getName() {
+        return builder.getName();
+    }
+
+    @Override
+    public PlayerGrenadeInstance createItemInstance(final EntityLivingBase entityLivingBase, final ItemStack itemStack, final int slot) {
+        final PlayerGrenadeInstance instance = new PlayerGrenadeInstance(slot, entityLivingBase, itemStack);
+
+        instance.setState(GrenadeState.READY);
+
+        return instance;
+    }
+
+    public void attack(EntityPlayer player, boolean throwingFar) {
+        modContext.getGrenadeAttackAspect().onAttackButtonClick(player, throwingFar);
+    }
+
+
+    public void attackUp(EntityPlayer player, boolean throwingFar) {
+        modContext.getGrenadeAttackAspect().onAttackButtonUp(player, throwingFar);
+    }
+
+    @Override
+    public void update(EntityPlayer player) {
+        modContext.getGrenadeAttackAspect().onUpdate(player);
+    }
+
+    public float getExplosionStrength() {
+        return builder.explosionStrength;
+    }
+
+    public int getExplosionTimeout() {
+        return builder.explosionTimeout;
+    }
+
+    public long getThrowTimeout() {
+        return 200;
+    }
+
+    public long getTotalTakeSafetyPinOffDuration() {
+        return builder.renderer.getTotalTakingSafetyPinOffDuration();
+    }
+
+    public long getReequipTimeout() {
+        return 800;
+    }
+
+    public double getTotalThrowingDuration() {
+        return builder.renderer.getTotalThrowingDuration();
+    }
+
+    public float getVelocity() {
+        return builder.velocity.get();
+    }
+
+    public float getFarVelocity() {
+        return builder.farVelocity.get();
+    }
+
+    public float getGravityVelocity() {
+        return builder.gravityVelocity.get();
+    }
+
+    public float getRotationSlowdownFactor() {
+        return builder.rotationSlowdownFactor.get();
+    }
+
+    public SoundEvent getBounceHardSound() {
+        return bounceHardSound;
+    }
+
+    public SoundEvent getBounceSoftSound() {
+        return bounceSoftSound;
+    }
+
+    public SoundEvent getExplosionSound() {
+        return explosionSound;
+    }
+
+    public SoundEvent getSafetyPinOffSound() {
+        return safetyPinOffSound;
+    }
+
+    public SoundEvent getThrowSound() {
+        return throwSound;
+    }
+
+    public SoundEvent getStopAfterThrowingSound() {
+        return stopAfterThrowingSound;
+    }
+
+    public float getEffectiveRadius() {
+        return builder.effectiveRadius;
+    }
+
+    public float getFragmentDamage() {
+        return builder.fragmentDamage;
+    }
+
+    public int getFragmentCount() {
+        return builder.fragmentCount;
+    }
+
+    public boolean isDestroyingBlocks() {
+        return builder.isDestroyingBlocks;
+    }
+
+    public Type getType() {
+        return builder.type;
+    }
+
+    public long getActiveDuration() {
+        return builder.activeDuration;
+    }
+
+    @Override
+    public Collection<CompatibleAttachment<? extends AttachmentContainer>> getCompatibleAttachments(
+            AttachmentCategory... categories) {
+        Collection<CompatibleAttachment<ItemGrenade>> c = builder.compatibleAttachments.values();
+        List<AttachmentCategory> inputCategoryList = Arrays.asList(categories);
+        return c.stream().filter(e -> inputCategoryList.contains(e)).collect(Collectors.toList());
+    }
+
+    // Todo: Remove this method once models are fixed to be at correct height
+    @Override
+    public boolean shouldCauseReequipAnimation(ItemStack oldStack, ItemStack newStack, boolean slotChanged) {
+        return true;
+    }
+}

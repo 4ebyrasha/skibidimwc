@@ -1,0 +1,203 @@
+package com.paneedah.weaponlib.crafting.ammopress;
+
+import com.paneedah.weaponlib.ItemBullet;
+import com.paneedah.weaponlib.crafting.CraftingEntry;
+import com.paneedah.weaponlib.crafting.CraftingGroup;
+import com.paneedah.weaponlib.crafting.ICraftingRecipe;
+import com.paneedah.weaponlib.crafting.base.TileEntityStation;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraftforge.common.util.Constants.NBT;
+import net.minecraftforge.fml.common.network.ByteBufUtils;
+
+import java.util.LinkedList;
+import java.util.Objects;
+
+public class TileEntityAmmoPress extends TileEntityStation {
+
+    public static final int BULLET_CRAFT_DURATION = 2;
+    public static final int MAGAZINE_CRAFT_DURATION = 100;
+    //public static final int BULLET_DISMANTLE_DURATION = 2;
+    public static final int BULLETS_CRAFTED_PER_PRESS = 6;
+
+    private boolean crafting;
+
+    public LinkedList<ItemStack> craftStack = new LinkedList<>();
+
+    private double currentWheelRotation = 0.0;
+    private double prevWheelRotation = 0.0;
+
+    public TileEntityAmmoPress() {}
+
+    public double getCurrentWheelRotation() {
+        return currentWheelRotation;
+    }
+
+    public double getPreviousWheelRotation() {
+        return prevWheelRotation;
+    }
+
+    public int getCraftingDurationForItem(Item item) {
+        if (!(item instanceof ICraftingRecipe)) {
+            return 0;
+        }
+        return getDismantlingTime((ICraftingRecipe) item);
+    }
+
+    @Override
+    public int getDismantlingTime(ICraftingRecipe crafting) {
+        CraftingGroup group = crafting.getCraftingGroup();
+        if (Objects.requireNonNull(group) == CraftingGroup.BULLET) {
+            return BULLET_CRAFT_DURATION;
+        }
+
+        return MAGAZINE_CRAFT_DURATION;
+    }
+
+
+    public ItemStack getLatestStackInQueue() {
+        if (this.craftStack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack stack = craftStack.peek();
+        if (stack.isEmpty()) {
+            craftStack.pop();
+            return getLatestStackInQueue();
+        }
+
+        return stack;
+    }
+
+    @Override
+    public void writeBytesForClientSync(ByteBuf buf) {
+        super.writeBytesForClientSync(buf);
+
+        buf.writeInt(this.craftStack.size());
+        for (ItemStack stack : craftStack) {
+            ByteBufUtils.writeItemStack(buf, stack);
+            buf.writeInt(stack.getCount());
+        }
+    }
+
+    @Override
+    public void readBytesFromClientSync(ByteBuf buf) {
+        super.readBytesFromClientSync(buf);
+        this.craftStack.clear();
+
+        int size = buf.readInt();
+        for (int i = 0; i < size; ++i) {
+            ItemStack stack = ByteBufUtils.readItemStack(buf);
+            stack.setCount(buf.readInt());
+            this.craftStack.offer(stack);
+        }
+
+
+    }
+
+    public boolean hasStack() {
+        return !this.craftStack.isEmpty() && getLatestStackInQueue() != ItemStack.EMPTY;
+    }
+
+    public void addStack(ItemStack stack) {
+        this.craftStack.offer(stack);
+    }
+
+    public LinkedList<ItemStack> getCraftingQueue() {
+        return this.craftStack;
+    }
+
+
+    @Override
+    public NBTTagCompound writeToNBT(NBTTagCompound compound) {
+        super.writeToNBT(compound);
+
+        NBTTagList stackNBTCompound = new NBTTagList();
+        for (ItemStack stack : this.craftStack) {
+            NBTTagCompound element = new NBTTagCompound();
+            stack.writeToNBT(element);
+            stackNBTCompound.appendTag(element);
+        }
+
+        compound.setTag("craftingStack", stackNBTCompound);
+
+        return compound;
+    }
+
+    @Override
+    public void readFromNBT(NBTTagCompound compound) {
+        super.readFromNBT(compound);
+        if (compound.hasKey("craftingStack")) {
+            NBTTagList list = compound.getTagList("craftingStack", NBT.TAG_COMPOUND);
+            for (int i = 0; i < list.tagCount(); ++i)
+                this.craftStack.offer(new ItemStack(list.getCompoundTagAt(i)));
+        }
+    }
+
+    @Override
+    public void update() {
+        super.update();
+
+        if (hasStack()) {
+            boolean canCraftNextItem = true;
+
+            for (CraftingEntry entry : ((ICraftingRecipe) getLatestStackInQueue().getItem()).getCraftingRecipe()) {
+                if (inventoryContainsEnoughItems(entry, 22, 49)) {
+                    continue;
+                }
+
+                canCraftNextItem = false;
+                break;
+            }
+
+            if (craftingDuration == -1 && canCraftNextItem) {
+                craftingDuration = getCraftingDurationForItem(getLatestStackInQueue().getItem());
+            }
+
+            if (craftingDuration != -1) {
+                craftingTimer++;
+                crafting = true;
+            }
+
+            if (craftingTimer > craftingDuration) {
+                craftingTimer = -1;
+                prevCraftingTimer = -1;
+                craftingDuration = -1;
+                crafting = false;
+                ItemStack stack = getLatestStackInQueue();
+
+                ICraftingRecipe craftingRecipe = (ICraftingRecipe) stack.getItem();
+                for (CraftingEntry ingredient : craftingRecipe.getCraftingRecipe())
+                    consumeFromInventory(ingredient, 22, 49);
+
+                ItemStack splitOff = stack.splitStack(1);
+
+                // For every bullet crafted, output BULLETS_CRAFTED_PER_PRESS.
+                if (splitOff.getItem() instanceof ItemBullet) {
+                    splitOff.setCount(splitOff.getCount() * BULLETS_CRAFTED_PER_PRESS);
+                }
+
+                addStackToInventoryRange(splitOff, 0, 8);
+                sendUpdate();
+            }
+        }
+
+        if (this.world.isRemote && hasStack() && crafting) {
+            prevWheelRotation = currentWheelRotation;
+            currentWheelRotation += Math.PI / 32;
+
+            if (currentWheelRotation >= 2 * Math.PI) {
+                prevWheelRotation = 0;
+                currentWheelRotation = 0;
+            }
+
+        } else if ((!hasStack() || !crafting) && this.world.isRemote) {
+            // Velocity verlet integrator
+            double delta = (currentWheelRotation - prevWheelRotation) * 0.05;
+            prevWheelRotation = currentWheelRotation;
+            currentWheelRotation += delta;
+        }
+    }
+}

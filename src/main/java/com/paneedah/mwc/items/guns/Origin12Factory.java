@@ -1,0 +1,823 @@
+package com.paneedah.mwc.items.guns;
+
+import com.paneedah.mwc.MWC;
+import com.paneedah.mwc.init.MWCItems;
+import com.paneedah.mwc.instancing.PlayerWeaponInstance;
+import com.paneedah.mwc.models.*;
+import com.paneedah.mwc.proxies.CommonProxy;
+import com.paneedah.mwc.rendering.Transform;
+import com.paneedah.mwc.weapons.*;
+import com.paneedah.weaponlib.*;
+import com.paneedah.weaponlib.animation.Transition;
+import com.paneedah.weaponlib.compatibility.RecoilParam;
+import com.paneedah.weaponlib.config.BalancePackManager.GunConfigurationGroup;
+import com.paneedah.weaponlib.crafting.CraftingEntry;
+import com.paneedah.weaponlib.render.shells.ShellParticleSimulator.Shell.Type;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.item.Item;
+
+public class Origin12Factory implements GunFactory {
+
+    public Item createGun(CommonProxy commonProxy) {
+        return new Weapon.Builder()
+
+                .withName("origin12")
+                .withFireRate(0.3f)
+                .withRecoil(9f)
+                .withZoom(0.9f)
+                .withConfigGroup(GunConfigurationGroup.SHOTGUN)
+                .withShellType(Type.SHOTGUN)
+                .withModernScreenShaking(100.0, 0.7)
+                .hasFlashPedals()
+                .withMaxShots(1)
+                .withShootSound("origin12")
+                .withSilencedShootSound("ak15_silenced")
+                .withReloadSound("origin12_reload")
+                .withUnloadSound("origin12_unload")
+                .withInspectSound("inspection")
+                .withDrawSound("noaction_draw")
+                .withReloadingTime(45)
+                .withFlashIntensity(0.6f)
+                .withFlashScale(() -> 0.8f)
+                .withFlashOffsetX(() -> 0.12f)
+                .withFlashOffsetY(() -> 0.16f)
+                .withShellCasingModel(new com.paneedah.mwc.models.Shotgun12Gauge())
+                .withShellCasingModelTexture("shotgun12gauge")
+                .withInaccuracy(12f)
+                .withPellets(10)
+                .withCreativeTab(MWC.WEAPONS_TAB)
+                .useNewSystem()
+                .withRecoilParam(new RecoilParam(
+                        // The weapon power
+                        32.5,
+                        // Muzzle climb divisor
+                        24.0,
+                        // "Stock Length"
+                        50.0,
+                        // Recovery rate from initial shot
+                        0.3875,
+                        // Recovery rate @ "stock"
+                        0.45,
+                        // Recoil rotation (Y)
+                        0.0,
+                        // Recoil rotation (Z)
+                        0.0,
+                        // Ads similarity divisor
+                        1.0
+                ))
+
+
+                .withScreenShaking(RenderableState.SHOOTING,
+                        5f, // x
+                        1f, // y
+                        10f) // z
+
+                .withModernRecipe(new
+                        CraftingEntry(MWCItems.carbonComposite, 10), new
+                        CraftingEntry(MWCItems.gunmetalPlate, 14), new
+                        CraftingEntry(MWCItems.steelIngot, 5))
+
+                .withUnremovableAttachmentCategories(AttachmentCategory.GUARD)
+                .withUnremovableAttachmentCategories(AttachmentCategory.BACKGRIP)
+                .withCompatibleAttachment(Attachments.Origin12Stock, true, (model) -> {
+//            GlStateManager.translate(0f, 0f, 1f);
+                })
+                .withCompatibleAttachment(Attachments.HKS20Stock, (model) -> {
+//          GlStateManager.translate(0f, 0f, 1f);
+                })
+                .withCompatibleAttachment(Attachments.CollapsableMOEStock, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.MagpulCTRStock, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.MilSpecStock, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.HK416Stock, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.MagpulCTRStockTan, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.MilSpecStockTan, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.HK416StockTan, (model) -> {
+                    GlStateManager.translate(-0.008f, -0.0f, 0.1f);
+                    GlStateManager.scale(0.95F, 0.95F, 0.95F);
+                })
+                .withCompatibleAttachment(Attachments.Origin12Handguard, true, (model) -> {
+                    if (model instanceof Origin12Handguard) {
+//                GlStateManager.scale(1F, 0.98F, 1);
+                    } else if (model instanceof AKRail) {
+                        GlStateManager.translate(-0.222F, -1.5F, -4.4f);
+                        GlStateManager.scale(0.72F, 0.72F, 0.8F);
+                    } else if (model instanceof AKRail2) {
+                        GlStateManager.translate(-0.02F, -0.54F, -4.4f);
+                        GlStateManager.scale(0.72F, 0.72F, 0.8F);
+                        GlStateManager.rotate(180.000000f, 0f, 0f, 1f);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.HKS20Handguard, (model) -> {
+                    if (model instanceof HKS20Handguard) {
+//                GlStateManager.scale(1F, 0.98F, 1);
+                    } else if (model instanceof AKRail) {
+                        GlStateManager.translate(-0.222F, -1.5F, -4.4f);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    } else if (model instanceof AKRail2) {
+                        GlStateManager.translate(-0.02F, -0.54F, -4.4f);
+                        GlStateManager.scale(0F, 0F, 0F);
+                        GlStateManager.rotate(180.000000f, 0f, 0f, 1f);
+                    }
+                })
+                .withCompatibleAttachment(AuxiliaryAttachments.M4Rail, true, (model) -> {
+                    if (model instanceof AKRail) {
+                        GlStateManager.translate(0.11F, -1.1F, -5.8F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                        GlStateManager.rotate(90F, 0f, 0f, 1f);
+                    } else if (model instanceof AKRail2) {
+                        GlStateManager.translate(-0.35F, -0.9F, -5.8F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                        GlStateManager.rotate(-90F, 0f, 0f, 1f);
+                    } else if (model instanceof AKRail3) {
+                        GlStateManager.translate(-0.02F, -0.9F, -4F);
+                        GlStateManager.scale(0F, 0F, 0F);
+                        GlStateManager.rotate(180F, 0f, 0f, 1f);
+                    } else if (model instanceof AKRail4) {
+                        GlStateManager.translate(-0.222F, -1.5F, -2.4f);
+                        GlStateManager.scale(0.72F, 0.72F, 0.87F);
+                    } else if (model instanceof AKRail5) {
+                        GlStateManager.translate(-0.187F, -1.3F, -4.26f);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.Origin12Grip, true, (model) -> {
+//            GlStateManager.translate(0.02f, 0.2f, -0.4f);
+//            GlStateManager.scale(1.2F, 1.2F, 1.2F);
+                })
+                .withCompatibleAttachment(Attachments.HKS20Grip, (model) -> {
+//          GlStateManager.translate(0.02f, 0.2f, -0.4f);
+//          GlStateManager.scale(1.2F, 1.2F, 1.2F);
+                })
+                .withCompatibleAttachment(AuxiliaryAttachments.Origin12Action, true, (model) -> {
+//            GlStateManager.translate(0f, 0f, 1f);
+                })
+                .withCompatibleAttachment(Magazines.Origin12Mag, (model) -> {
+//        	GlStateManager.translate(0f, 0.4f, 0f);
+                })
+                .withCompatibleAttachment(Magazines.Origin12DrumMag, (model) -> {
+                    GlStateManager.translate(0f, 0.2f, -0.05f);
+                    GlStateManager.rotate(-8F, 1f, 0f, 0f);
+                })
+                .withCompatibleAttachment(Attachments.MBUSRearSights, true, (model) -> {
+                    if (model instanceof MBUSRearSight) {
+                        GlStateManager.translate(-0.16F, -1.7F, -0.5F);
+                        GlStateManager.scale(0.35F, 0.35F, 0.35F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.MBUSFrontSight, true, (model) -> {
+                    GlStateManager.translate(-0.16F, -1.7F, -3.6F);
+                    GlStateManager.scale(0.35F, 0.35F, 0.35F);
+                })
+                .withCompatibleAttachment(Attachments.MicroT1, (player, stack) -> {
+                    GlStateManager.translate(-0.176F, -1.61F, -1.2F);
+                    GlStateManager.scale(0.36F, 0.36F, 0.36F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(0.155F, -0.4F, -0.5F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.AimpointCompM5, (player, stack) -> {
+                    GlStateManager.translate(-0.176F, -1.61F, -1.2F);
+                    GlStateManager.scale(0.36F, 0.36F, 0.36F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(0.155F, -0.4F, -0.5F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.AimpointCompM2, (player, stack) -> {
+                    GlStateManager.translate(-0.12F, -0.93F, -1F);
+                    GlStateManager.scale(0.9F, 0.9F, 0.9F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(-0.005F, -0.89F, -1.5F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.Specter, (player, stack) -> {
+                    GlStateManager.translate(-0.19F, -1.25F, -1.2F);
+                    GlStateManager.scale(0.45F, 0.45F, 0.45F);
+                }, (model) -> {
+                    if (model instanceof Acog2) {
+                        GlStateManager.translate(0.15F, -1.035F, 1.513F);
+                        GlStateManager.scale(0.1F, 0.1F, 0.1F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.ACOG, (player, stack) -> {
+                    GlStateManager.translate(-0.315F, -1.6F, -1F);
+                    GlStateManager.scale(0.8F, 0.8F, 0.8F);
+                }, (model) -> {
+                    if (model instanceof AcogScope2) {
+                        GlStateManager.translate(-0.018F, -0.25F, 0.13F);
+                        GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                    } else if (model instanceof AcogReticle) {
+                        GlStateManager.translate(0.243F, -0.23F, 0.68f);
+                        GlStateManager.scale(0.03F, 0.03F, 0.03F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.Reflex, (player, stack) -> {
+                    GlStateManager.translate(-0.06F, -1.4F, -1.8F);
+                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(-0.125F, -0.7F, -0.4F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.BijiaReflex, (player, stack) -> {
+                    GlStateManager.translate(-0.055F, -1.37F, -1.8F);
+                    GlStateManager.scale(0.55F, 0.55F, 0.55F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(-0.125F, -0.68F, -0.4F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.Holographic, (player, stack) -> {
+                    GlStateManager.translate(-0.035F, -1.43F, -1.4F);
+                    GlStateManager.scale(0.75F, 0.75F, 0.75F);
+                }, (model) -> {
+                    if (model instanceof Holo2) {
+                        GlStateManager.translate(-0.125F, -0.5F, -0.1F);
+                        GlStateManager.scale(0.1F, 0.1F, 0.1F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.HolographicAlt, (player, stack) -> {
+                    GlStateManager.translate(-0.035F, -1.43F, -1.4F);
+                    GlStateManager.scale(0.75F, 0.75F, 0.75F);
+                }, (model) -> {
+                    if (model instanceof Holo2) {
+                        GlStateManager.translate(-0.125F, -0.5F, -0.1F);
+                        GlStateManager.scale(0.1F, 0.1F, 0.1F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.EotechHybrid2, (player, stack) -> {
+                    GlStateManager.translate(-0.035F, -1.43F, -1.8F);
+                    GlStateManager.scale(0.75F, 0.75F, 0.75F);
+                }, (model) -> {
+                    if (model instanceof EotechScopeRing) {
+                        GlStateManager.translate(-0.2F, -0.41F, 1.8F);
+                        GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                    }
+                    if (model instanceof Holo2) {
+                        GlStateManager.translate(-0.118F, -0.535F, 1.9F);
+                        GlStateManager.scale(0.05F, 0.05F, 0.05F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.VortexRedux, (player, stack) -> {
+                    GlStateManager.translate(-0.32F, -1.66F, -1.5F);
+                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                }, (model) -> {
+                    if (model instanceof Holo2) {
+                        GlStateManager.translate(-0.125F, -0.5F, -0.1F);
+                        GlStateManager.scale(0.1F, 0.1F, 0.1F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.Kobra, (player, stack) -> {
+                    GlStateManager.translate(-0.027F, -1.44F, -1.3F);
+                    GlStateManager.scale(0.75F, 0.75F, 0.75F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(-0.125F, -0.45F, -0.85F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.KobraGen3, (player, stack) -> {
+                    GlStateManager.translate(-0.027F, -1.44F, -1.3F);
+                    GlStateManager.scale(0.75F, 0.75F, 0.75F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(-0.125F, -0.45F, -0.85F);
+                        GlStateManager.scale(0.15F, 0.15F, 0.15F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.RMR, (player, stack) -> {
+                    GlStateManager.translate(-0.18F, -1.6F, -1.1F);
+                    GlStateManager.scale(0.35F, 0.35F, 0.35F);
+                }, (model) -> {
+                    if (model instanceof Reflex2) {
+                        GlStateManager.translate(0.15F, -0.03F, -1.5F);
+                        GlStateManager.scale(0.3F, 0.3F, 0.3F);
+                    }
+                })
+                .withCompatibleAttachment(Attachments.Grip2, (model) -> {
+                    GlStateManager.translate(0.6F, -0.95F, -4F);
+                    GlStateManager.rotate(-90F, 0f, 0f, 1f);
+                    GlStateManager.scale(1F, 1F, 1F);
+                })
+                .withCompatibleAttachment(Attachments.StubbyGrip, (model) -> {
+                    GlStateManager.translate(-0.2F, -0.1F, -3.5F);
+                    GlStateManager.scale(1F, 1F, 1F);
+                })
+                .withCompatibleAttachment(Attachments.AngledGrip, (model) -> {
+                    GlStateManager.translate(-0.2F, 0.05F, -4F);
+                    GlStateManager.scale(1F, 1F, 1F);
+                })
+                .withCompatibleAttachment(Attachments.VGrip, (model) -> {
+                    GlStateManager.translate(-0.2F, -0.1F, -3.5F);
+                    GlStateManager.scale(1F, 1F, 1F);
+                })
+                .withCompatibleAttachment(Attachments.Silencer12Gauge, renderContext -> {
+                    PlayerWeaponInstance instance = renderContext.getWeaponInstance();
+                    if (instance != null) {
+                        ItemAttachment<Weapon> activeAttachment = WeaponAttachmentAspect.getActiveAttachment(
+                                AttachmentCategory.FRONTSIGHT, instance);
+                        if (activeAttachment == Attachments.RPKBarrel) {
+                            GlStateManager.translate(-0.2F, -1.06F, -8.8F);
+                            GlStateManager.scale(1F, 1F, 1F);
+                        } else {
+                            GlStateManager.translate(-0.28F, -1.43F, -7.65F);
+                            GlStateManager.scale(2F, 2F, 2F);
+                        }
+                    }
+                }, (model) -> {
+                    if (model instanceof AcogReticle) {
+                        GlStateManager.translate(0F, 0F, 0f);
+                        GlStateManager.scale(0F, 0F, 0F);
+                    }
+                }, false, false)
+                .withTextureNames("origin12")
+                .withRenderer(new WeaponRenderer.Builder()
+
+                        .withModel(new Origin12())
+                        //.withTextureName("AK47")
+                        //.withWeaponProximity(0.99F)
+                        //.withYOffsetZoom(5F)
+                        .withEntityPositioning(itemStack -> {
+                            GlStateManager.scale(0.35F, 0.35F, 0.35F);
+                            GlStateManager.rotate(-90F, 0f, 0f, 4f);
+                        })
+                        .withInventoryPositioning(itemStack -> {
+                            GlStateManager.scale(0.28F, 0.28F, 0.28F);
+                            GlStateManager.translate(1, 2f, -1.2f);
+                            GlStateManager.rotate(-120F, -0.5f, 7f, 3f);
+                        })
+                        .withThirdPersonPositioning((renderContext) -> {
+                            GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                            GlStateManager.translate(-1.8F, -1.1F, 2F);
+                            GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                            GlStateManager.rotate(70F, 1f, 0f, 0f);
+                        })
+
+                        .withFirstPersonPositioning(
+                                new Transform()
+                                        .withPosition(-1.545000f, 4.665000f, -2.605000f)
+                                        .withRotation(0.000000f, 1.000000f, 9.911787f)
+                                        .withPivotPoint(-0.470000f, -1.260000f, 0.220000f)
+                                        .withScale(3.0F, 3.0F, 3.0F)
+                        )
+
+                        .withFirstPersonHandPositioning(
+
+                                // Left hand
+                                new Transform()
+                                        .withPosition(1.370000f, 0.705000f, -0.980000f)
+                                        .withBBRotation(-9.3558F, -36.5488F, 60.0121F)
+                                        .withScale(2.6F, 2.6F, 4.0F)
+                                        .withPivotPoint(0, 0, 0),
+
+
+                                // Right hand
+                                new Transform()
+                                        .withPosition(-0.2F, 0.1F, 2)
+                                        .withRotation(-5.4027F, -4.7805F, -1.6694F)
+                                        .withScale(3.5F, 3.5F, 3.5F)
+                                        .withPivotPoint(0, 0, 0)
+
+                        )
+
+                        .setupModernAnimations("origin12", AuxiliaryAttachments.Origin12Action)
+                        .setupModernMagazineAnimations("origin12",
+                                Magazines.Origin12Mag,
+                                Magazines.Origin12DrumMag)
+
+                        .withFirstPersonPositioningCustomRecoiled(AuxiliaryAttachments.Origin12Action.getRenderablePart(), (renderContext) -> {
+                            GlStateManager.translate(0f, 0f, 1f);
+                        })
+
+                        .withFirstPersonPositioningCustomZoomingRecoiled(AuxiliaryAttachments.Origin12Action.getRenderablePart(), (renderContext) -> {
+                            GlStateManager.translate(0f, 0f, 1f);
+                        })
+
+                        .withThirdPersonPositioningReloading(
+//                    new Transition((renderContext) -> { // Reload position
+//                        GlStateManager.scale(3.000000f, 3.000000f, 3.000000f);
+//                        GlStateManager.rotate(-10.000000f, 1f, 0f, 0f);
+//                        GlStateManager.rotate(45.000000f, 0f, 1f, 0f);
+//                        GlStateManager.rotate(65.000000f, 0f, 0f, 1f);
+//                        GlStateManager.translate(0.150000f, 1.149999f, 0.175000f);
+//                    }, 200, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 2.7F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                }, 210, 100),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 2.7F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                }, 130, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 2.7F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                }, 240, 0),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 2.7F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                }, 400, 150),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 2.7F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                }, 300, 60),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 2.7F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                }, 120, 190),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2.7F, 3.6F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                    GlStateManager.rotate(12F, 0f, 0f, 1f);
+                                }, 300, 100),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2F, 3.6F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(95F, 1f, 0f, 0f);
+                                    GlStateManager.rotate(12F, 0f, 0f, 1f);
+                                }, 120, 100),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(0.5F, 0.5F, 0.5F);
+                                    GlStateManager.translate(-2.2F, -2.7F, 3.6F);
+                                    GlStateManager.rotate(-45F, 0f, 1f, 0f);
+                                    GlStateManager.rotate(90F, 1f, 0f, 0f);
+                                    GlStateManager.rotate(12F, 0f, 0f, 1f);
+                                }, 120, 0)
+//                }, 100, 0)
+                        )
+
+
+                        .withThirdPersonCustomPositioningReloading(AuxiliaryAttachments.Origin12Action.getRenderablePart(),
+//                    new Transition((renderContext) -> {
+//                    }, 500, 1000),
+                                new Transition((renderContext) -> {
+                                }, 500, 1000),
+                                new Transition((renderContext) -> {
+                                }, 500, 1000),
+                                new Transition((renderContext) -> {
+                                }, 500, 1000),
+                                new Transition((renderContext) -> {
+                                }, 250, 1000),
+                                new Transition((renderContext) -> {
+                                }, 250, 1000),
+                                new Transition((renderContext) -> {
+                                }, 250, 1000),
+                                new Transition((renderContext) -> {
+                                }, 250, 1000),
+                                new Transition((renderContext) -> {
+                                    GlStateManager.translate(0f, 0f, 1f);
+                                }, 250, 1000),
+                                new Transition((renderContext) -> {
+                                }, 250, 1000)
+                        )
+
+                        .withFirstPersonPositioningZooming((renderContext) -> {
+//                GlStateManager.rotate(45F, 0f, 1f, 0f);
+                            GlStateManager.scale(3.000000f, 3.000000f, 3.000000f);
+                            GlStateManager.translate(0.14f, 1.26f, 0.0f);
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.MicroT1)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0f, 0.2f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.AimpointCompM5)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0f, 0.2f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.AimpointCompM2)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.03f, 0.2f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.Specter)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, -0.05f, 0.2f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.ACOG)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.05f, 0.4f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.Reflex)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, -0.00f, 0.4f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.BijiaReflex)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.00f, 0.4f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.Holographic)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.03f, 0.1f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.HolographicAlt)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.03f, 0.1f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.EotechHybrid2)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.05f, 0.1f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.VortexRedux)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.075f, 0.1f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.Kobra)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.06f, 0.1f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.KobraGen3)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, 0.06f, 0.1f);
+                            }
+
+                            // ACOG Zoom
+                            if (Weapon.isActiveAttachment(renderContext.getWeaponInstance(), Attachments.RMR)) {
+                                //System.out.println("Position me for Acog");
+                                GlStateManager.translate(0F, -0.10f, 0f);
+                            }
+
+                            // Everything else
+                            else {
+                            }
+
+
+                        })
+
+                        .withFirstPersonPositioningModifying((renderContext) -> {
+                            new Transform()
+                                    .withPosition(-1.545000f, 5.305000f, -5.205000f)
+                                    .withRotation(-3.220844f, -26.042916f, -15.848692f)
+                                    .withPivotPoint(-0.350000f, -2.900000f, -0.100000f)
+                                    .withScale(3.000000f, 3.000000f, 3.000000f)
+                                    .applyTransformations();
+                        })
+                        .withFirstPersonPositioningModifyingAlt((renderContext) -> {
+                            new Transform()
+                                    .withPosition(-1.545000f, 5.305000f, -6.765000f)
+                                    .withRotation(-3.220844f, -42.465731f, -15.848692f)
+                                    .withPivotPoint(-0.350000f, -2.900000f, -0.100000f)
+                                    .withScale(3.000000f, 3.000000f, 3.000000f)
+                                    .applyTransformations();
+                        })
+
+                        .withFirstPersonHandPositioningModifying(
+                                (renderContext) -> {
+                                    new Transform()
+                                            .withPosition(4.370000f, 0.705000f, 2.100000f)
+                                            .withRotation(77.474485f, 36.548800f, 14.076018f)
+                                            .withScale(2.6F, 2.6F, 4.0F)
+                                            .withPivotPoint(0.000000f, 0.000000f, 0.000000f)
+                                            .applyTransformations();
+                                },
+                                (renderContext) -> {
+                                    new Transform()
+                                            .withPosition(-0.2F, 0.1F, 2)
+                                            .withRotation(-5.4027F, -4.7805F, -1.6694F)
+                                            .withScale(3.5F, 3.5F, 3.5F)
+                                            .withPivotPoint(0, 0, 0)
+                                            .applyTransformations();
+                                })
+
+                        .withFirstPersonHandPositioningModifyingAlt(
+                                (renderContext) -> {
+                                    new Transform()
+                                            .withPosition(4.370000f, 0.705000f, 2.100000f)
+                                            .withRotation(77.474485f, 36.548800f, 14.076018f)
+                                            .withScale(2.600000f, 2.600000f, 4.000000f)
+                                            .withPivotPoint(0.000000f, 0.000000f, 0.000000f)
+                                            .applyTransformations();
+                                },
+                                (renderContext) -> {
+                                    new Transform()
+                                            .withPosition(-0.600000f, 0.340000f, 1.880000f)
+                                            .withRotation(-12.193518f, -4.780500f, 1.399459f)
+                                            .withScale(3.5F, 3.5F, 3.5F)
+                                            .withPivotPoint(0.000000f, 0.000000f, 0.000000f)
+                                            .applyTransformations();
+                                })
+
+                        .withThirdPersonLeftHandPositioningReloading(
+//                    new Transition((renderContext) -> { // Reload position
+//                        GlStateManager.scale(3.5f, 3.5f, 3.5f);
+//                        GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+//                        GlStateManager.rotate(-45.000000f, 0f, 1f, 0f);
+//                        GlStateManager.rotate(30.000000f, 0f, 0f, 1f);
+//                        GlStateManager.translate(0.250000f, -0.175000f, 0.225000f);
+//                    }, 50, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 50, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 50, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-20.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.025000f, -0.075000f, -0.075000f);
+                                }, 50, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-20.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(20.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.025000f, -0.075000f, -0.075000f);
+                                }, 50, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 50, 200),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 250, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 250, 100),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 280, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-40.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(-10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(40.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(-0.100000f, -0.025000f, 0.000000f);
+                                }, 280, 0))
+
+                        .withThirdPersonRightHandPositioningReloading(
+//                    new Transition((renderContext) -> { // Reload position
+//                        GlStateManager.scale(4f, 4f, 5f);
+//                        GlStateManager.rotate(-100.000000f, 1f, 0f, 0f);
+//                        GlStateManager.rotate(10.000000f, 0f, 1f, 0f);
+//                        GlStateManager.rotate(-55.000000f, 0f, 0f, 1f);
+//                        GlStateManager.translate(0.375000f, -0.500000f, 0.150000f);
+//                    }, 250, 1000),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-50.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(0.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.000000f, -0.125000f, 0.100000f);
+                                }, 250, 1000),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-49.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(-1.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.000000f, -0.125000f, 0.100000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-50.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(3.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.000000f, -0.125000f, 0.100000f);
+                                }, 250, 50),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-50.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(2.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.000000f, -0.125000f, 0.100000f);
+                                }, 250, 1000),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-50.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(0.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.000000f, -0.125000f, 0.100000f);
+                                }, 250, 50),
+
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-55.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(14.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(0.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.000000f, -0.125000f, 0.100000f);
+                                }, 260, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-60.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(15.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, 0.050000f, 0.000000f);
+                                }, 250, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-60.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(15.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(15.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.075000f, -0.075000f, 0.025000f);
+                                }, 250, 0),
+                                new Transition((renderContext) -> { // Reload position
+                                    GlStateManager.scale(1.000000f, 1.000000f, 1.000000f);
+                                    GlStateManager.rotate(-60.000000f, 1f, 0f, 0f);
+                                    GlStateManager.rotate(15.000000f, 0f, 1f, 0f);
+                                    GlStateManager.rotate(10.000000f, 0f, 0f, 1f);
+                                    GlStateManager.translate(0.050000f, 0.050000f, 0.000000f);
+                                }, 300, 0))
+
+                        .build())
+                .withSpawnEntityDamage(6f)
+                .withSpawnEntityGravityVelocity(0.0118f)
+
+                .build(MWC.modContext);
+    }
+}
+

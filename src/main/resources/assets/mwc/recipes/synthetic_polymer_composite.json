@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "XXX",
+    "XXX"
+  ],
+  "key": {
+    "X": {
+      "item": "${id}:carbon_composite"
+    }
+  },
+  "result": {
+    "item": "${id}:synthetic_polymer_composite",
+    "count": 3
+  }
+}

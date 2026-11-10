@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "   ",
+    "XXX",
+    "XXX"
+  ],
+  "key": {
+    "X": {
+      "item": "${id}:graphite_chunk"
+    }
+  },
+  "result": {
+    "item": "${id}:carbon_composite",
+    "count": 3
+  }
+}
