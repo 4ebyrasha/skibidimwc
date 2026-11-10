@@ -258,9 +258,30 @@ public class WeaponSpawnEntity extends EntityProjectile {
 
     @Override
     public void setPositionAndDirection(boolean isAiming) {
-        super.setPositionAndDirection(isAiming);
-        this.prevPosOnServer = new Vec3d(this.posX, this.posY, this.posZ);
-        this.startPos = new Vec3d(this.posX, this.posY, this.posZ); // запоминаем точку вылета
+        setPositionAndDirectionFromShot(
+                isAiming,
+                thrower.rotationYaw,
+                thrower.rotationPitch
+        );
+    }
+
+    @Override
+    public void setPositionAndDirectionFromShot(
+            boolean isAiming,
+            float shotYaw,
+            float shotPitch
+    ) {
+        super.setPositionAndDirectionFromShot(
+                isAiming,
+                shotYaw,
+                shotPitch
+        );
+
+        this.prevPosOnServer =
+                new Vec3d(this.posX, this.posY, this.posZ);
+
+        this.startPos =
+                new Vec3d(this.posX, this.posY, this.posZ);
     }
 
     private boolean isBlockedByBlocks(Vec3d from, Vec3d to) {

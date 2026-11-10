@@ -13,15 +13,14 @@ public final class TryFireMessage implements IMessage {
     private boolean isAimed;
 
     private long clientShotTimestampNanos;
-
     private boolean hasClientShotTimestamp;
 
+    private float shotYaw;
+    private float shotPitch;
+    private boolean hasShotDirection;
+
     public TryFireMessage(boolean isBurst, boolean isAimed) {
-        this(
-                isBurst,
-                isAimed,
-                System.nanoTime()
-        );
+        this(isBurst, isAimed, System.nanoTime());
     }
 
     public TryFireMessage(
@@ -29,33 +28,57 @@ public final class TryFireMessage implements IMessage {
             boolean isAimed,
             long clientShotTimestampNanos
     ) {
-
         this.isBurst = isBurst;
         this.isAimed = isAimed;
-
         this.clientShotTimestampNanos = clientShotTimestampNanos;
         this.hasClientShotTimestamp = true;
+    }
+
+    public TryFireMessage(
+            boolean isBurst,
+            boolean isAimed,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch
+    ) {
+        this(isBurst, isAimed, clientShotTimestampNanos);
+
+        this.shotYaw = shotYaw;
+        this.shotPitch = shotPitch;
+        this.hasShotDirection = true;
     }
 
     public boolean hasClientShotTimestamp() {
         return hasClientShotTimestamp;
     }
 
+    public boolean hasShotDirection() {
+        return hasShotDirection;
+    }
+
     @Override
     public void fromBytes(ByteBuf buf) {
-
         isBurst = buf.readBoolean();
         isAimed = buf.readBoolean();
 
         clientShotTimestampNanos = 0L;
         hasClientShotTimestamp = false;
-        if (buf.readableBytes() >= 8) {
+        shotYaw = 0.0F;
+        shotPitch = 0.0F;
+        hasShotDirection = false;
 
+        if (buf.readableBytes() >= 8) {
             clientShotTimestampNanos = buf.readLong();
             hasClientShotTimestamp = true;
+        }
 
-        } else if (buf.readableBytes() != 0) {
+        if (buf.readableBytes() >= 8) {
+            shotYaw = buf.readFloat();
+            shotPitch = buf.readFloat();
+            hasShotDirection = true;
+        }
 
+        if (buf.readableBytes() != 0) {
             throw new IllegalStateException(
                     "Invalid TryFireMessage: "
                             + buf.readableBytes()
@@ -66,10 +89,13 @@ public final class TryFireMessage implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buf) {
-
         buf.writeBoolean(isBurst);
         buf.writeBoolean(isAimed);
-
         buf.writeLong(clientShotTimestampNanos);
+
+        if (hasShotDirection) {
+            buf.writeFloat(shotYaw);
+            buf.writeFloat(shotPitch);
+        }
     }
 }

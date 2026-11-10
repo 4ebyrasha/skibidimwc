@@ -81,21 +81,53 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     }
 
     public void setPositionAndDirection(boolean isAiming) {
+        setPositionAndDirectionFromShot(
+                isAiming,
+                thrower.rotationYaw,
+                thrower.rotationPitch
+        );
+    }
+
+    public void setPositionAndDirectionFromShot(
+            boolean isAiming,
+            float shotYaw,
+            float shotPitch
+    ) {
         double x = thrower.posX;
         double y = thrower.posY + thrower.getEyeHeight();
         double z = thrower.posZ;
 
-        x -= Math.cos(thrower.rotationYaw / 180 * Math.PI) * (isAiming ? 0 : 0.16);
-        y -= (isAiming ? 0 : 0.1);
-        z -= Math.sin(thrower.rotationYaw / 180 * Math.PI) * (isAiming ? 0 : 0.16);
+        x -= Math.cos(shotYaw / 180 * Math.PI)
+                * (isAiming ? 0 : 0.16);
 
-        setPositionAndRotation(x, y, z, thrower.rotationYaw, thrower.rotationPitch);
+        y -= isAiming ? 0 : 0.1;
 
-        motionX = -Math.sin(rotationYaw / 180 * Math.PI) * Math.cos(rotationPitch / 180 * Math.PI);
+        z -= Math.sin(shotYaw / 180 * Math.PI)
+                * (isAiming ? 0 : 0.16);
+
+        setPositionAndRotation(
+                x,
+                y,
+                z,
+                shotYaw,
+                shotPitch
+        );
+
+        motionX = -Math.sin(rotationYaw / 180 * Math.PI)
+                * Math.cos(rotationPitch / 180 * Math.PI);
+
         motionY = -Math.sin(rotationPitch / 180 * Math.PI);
-        motionZ = Math.cos(rotationYaw / 180 * Math.PI) * Math.cos(rotationPitch / 180 * Math.PI);
 
-        setThrowableHeading(motionX, motionY, motionZ, velocity, inaccuracy);
+        motionZ = Math.cos(rotationYaw / 180 * Math.PI)
+                * Math.cos(rotationPitch / 180 * Math.PI);
+
+        setThrowableHeading(
+                motionX,
+                motionY,
+                motionZ,
+                velocity,
+                inaccuracy
+        );
     }
 
     /**

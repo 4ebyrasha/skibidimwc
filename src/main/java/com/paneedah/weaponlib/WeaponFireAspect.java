@@ -350,12 +350,18 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         long clientShotTimestampNanos = System.nanoTime();
 
+        // РЎРѕС…СЂР°РЅСЏРµРј РЅР°РїСЂР°РІР»РµРЅРёРµ РїСЂРёС†РµР»Р° РґРѕ РїСЂРёРјРµРЅРµРЅРёСЏ РѕС‚РґР°С‡Рё.
+        float shotYaw = player.rotationYaw;
+        float shotPitch = player.rotationPitch;
+
         CHANNEL.sendToServer(
                 new TryFireMessage(
                         oneClickBurstEnabled.test(weaponInstance)
                                 && weaponInstance.getSeriesShotCount() == 0,
                         weaponInstance.isAimed(),
-                        clientShotTimestampNanos
+                        clientShotTimestampNanos,
+                        shotYaw,
+                        shotPitch
                 )
         );
 
@@ -374,12 +380,9 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             if (silencerOn) {
 
                 if (shooterIndoor) {
-
                     shooterSoundSlot = "stereoCloseSilencedIndoorSound";
                     shooterSound = weapon.getStereoCloseSilencedIndoorSound();
-
                 } else {
-
                     shooterSoundSlot = "stereoCloseSilencedOutdoorSound";
                     shooterSound = weapon.getStereoCloseSilencedOutdoorSound();
                 }
@@ -387,12 +390,9 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             } else {
 
                 if (shooterIndoor) {
-
                     shooterSoundSlot = "stereoCloseIndoorSound";
                     shooterSound = weapon.getStereoCloseIndoorSound();
-
                 } else {
-
                     shooterSoundSlot = "stereoCloseOutdoorSound";
                     shooterSound = weapon.getStereoCloseOutdoorSound();
                 }
@@ -569,7 +569,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             boolean isBurst,
             boolean isAimed
     ) {
-
         serverFire(
                 player,
                 isBurst,
@@ -584,7 +583,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             boolean isAimed,
             long clientShotTimestampNanos
     ) {
-
         serverFire(
                 player,
                 player.getHeldItemMainhand(),
@@ -592,7 +590,30 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 isBurst,
                 isAimed,
                 1.0f,
-                clientShotTimestampNanos
+                clientShotTimestampNanos,
+                player.rotationYaw,
+                player.rotationPitch
+        );
+    }
+
+    public void serverFire(
+            EntityLivingBase player,
+            boolean isBurst,
+            boolean isAimed,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch
+    ) {
+        serverFire(
+                player,
+                player.getHeldItemMainhand(),
+                null,
+                isBurst,
+                isAimed,
+                1.0f,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch
         );
     }
 
@@ -604,7 +625,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             boolean isAimed,
             float damageMultiplier
     ) {
-
         serverFire(
                 player,
                 itemStack,
@@ -625,6 +645,30 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             float damageMultiplier,
             long clientShotTimestampNanos
     ) {
+        serverFire(
+                player,
+                itemStack,
+                spawnEntityWith,
+                isBurst,
+                isAimed,
+                damageMultiplier,
+                clientShotTimestampNanos,
+                player.rotationYaw,
+                player.rotationPitch
+        );
+    }
+
+    public void serverFire(
+            EntityLivingBase player,
+            ItemStack itemStack,
+            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
+            boolean isBurst,
+            boolean isAimed,
+            float damageMultiplier,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch
+    ) {
 
         if (itemStack == null
                 || itemStack.isEmpty()
@@ -639,9 +683,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         int currentServerAmmo = Tags.getAmmo(itemStack);
 
         if (currentServerAmmo <= 0) {
-
             LOGGER.error("No server ammo");
-
             return;
         }
 
@@ -699,15 +741,10 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         final double soundBroadcastRadius;
 
         if (silencerOn) {
-
             soundBroadcastRadius = 80.0;
-
         } else if (shooterIndoor) {
-
             soundBroadcastRadius = 120.0;
-
         } else {
-
             soundBroadcastRadius = 220.0;
         }
 
@@ -760,7 +797,11 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     0
             );
 
-            bullet.setPositionAndDirection(isAimed);
+            bullet.setPositionAndDirectionFromShot(
+                    isAimed,
+                    shotYaw,
+                    shotPitch
+            );
 
             player.world.spawnEntity(bullet);
         }
