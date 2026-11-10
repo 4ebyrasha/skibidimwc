@@ -22,6 +22,7 @@ public class VSSVintorezFactory implements GunFactory {
 
                 .withName("vss_vintorez")
                 .withSubsonic() // ДОЗВУКОВОЙ ЕПТ ПАЦАН
+                .withInaccuracy(0f)
                 .withFireRate(0.76f)
                 .withRecoil(2.5f)
                 .withZoom(0.9f)

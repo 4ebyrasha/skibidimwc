@@ -169,13 +169,13 @@ public class ClientEventHandler {
 
         // ModernConfigManager.init();
 
-        if (player != null && event.phase == TickEvent.Phase.END) {
+        /* if (player != null && event.phase == TickEvent.Phase.END) {
             final double yAmount = ClientValueRepo.recoilWoundY * 0.2;
             player.rotationPitch += yAmount;
             ClientValueRepo.recoilWoundY -= yAmount;
 
             //TODO: Make a check to see If the ammo in the gun is greater than the max ammo in the magazine.
-        }
+        } fuck this shit */
 
         // Past here we only want to deal with Phase.START.
         // Also we should be in a world.

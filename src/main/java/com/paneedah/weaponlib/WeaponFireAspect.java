@@ -471,7 +471,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         player.rotationYaw =
                 player.rotationYaw + recoilAmount * rotationYawFactor * 0.4f;
 
-        ClientValueRepo.recoilWoundY += recoilAmount * 0.7f;
 
         if (ModernConfigManager.enableMuzzleEffects
                 && weapon.builder.flashIntensity > 0) {

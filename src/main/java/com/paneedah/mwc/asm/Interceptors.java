@@ -748,12 +748,6 @@ public class Interceptors {
         }
 
 
-        if (ClientValueRepo.recoilWoundY > 0) {
-            ClientValueRepo.recoilWoundY -= Math.abs(pitchDelta) * 0.15;
-            if (ClientValueRepo.recoilWoundY < 0) {
-                ClientValueRepo.recoilWoundY = 0;
-            }
-        }
 
         //	System.out.println(ClientValueRepo.recoilWoundY);
         //	ClientValueRepo.recoilWoundY -= pitchDelta*0.2;

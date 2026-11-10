@@ -108,7 +108,6 @@ public class ClientValueRepo {
 
     public static boolean shouldContinueRunning = false;
 
-    public static double recoilWoundY;
 
 
     public static void fireWeapon(PlayerWeaponInstance pwi) {
