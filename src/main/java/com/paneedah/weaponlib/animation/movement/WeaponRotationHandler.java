@@ -47,7 +47,7 @@ public class WeaponRotationHandler {
     private static final double RECOIL_ANIMATION_AMPLITUDE = 0.008;
 
 
-    private static final float SWAY_AMPLITUDE_NORMAL = 0.15f;
+    private static final float SWAY_AMPLITUDE_NORMAL = 0.08f;
     private static final float SWAY_AMPLITUDE_OPTICAL_ADS = 0.03f;
 
     // Divisor multiplier if the player is using an optical scope
