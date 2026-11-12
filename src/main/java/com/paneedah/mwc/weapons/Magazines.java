@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.GlStateManager;
 
 public class Magazines {
 
+    public static ItemMagazine SR3MMag;
     public static ItemMagazine AUG9mmMag;
     public static ItemMagazine S710TricunMag;
     public static ItemMagazine M4A1Mag;
@@ -128,6 +129,42 @@ public class Magazines {
     public static ItemMagazine NinthSinMag;
 
     public static void init(ModContext modContext) {
+
+        // todo: fix sr3m mag for vss
+        Magazines.SR3MMag = new ItemMagazine.Builder()
+                .withCapacity(30)
+                .withCompatibleBullet(Bullets.Bullet9x39mm)
+                .withName("SR3MMag")
+                .withPivotPoint(
+                        -0.040000001192092904F,
+                        -0.28000000834465033F,
+                        -1.3600000405311587F
+                )
+                .withCreativeTab(MWC.AMMUNITION_AND_MAGAZINES_TAB)
+                .withModel(new com.paneedah.mwc.models.SR3MMag(), "vssvintorez.png")
+
+                .withFirstPersonPositioning(() -> {
+                    GlStateManager.translate(0.1F, -0.3F, 0.4F);
+                    GlStateManager.rotate(30F, 0f, 1f, 0f);
+                    GlStateManager.scale(0.7F, 0.7F, 0.7F);
+                })
+                .withThirdPersonPositioning(() -> {
+                    GlStateManager.translate(-0.3F, 0.5F, 0.1F);
+                    GlStateManager.rotate(-50F, 0f, 1f, 0f);
+                    GlStateManager.rotate(10F, 1f, 0f, 0f);
+                    GlStateManager.scale(0.7F, 0.7F, 0.7F);
+                })
+                .withInventoryPositioning(() -> {
+                    GlStateManager.translate(0.3F, 1.2F, -2.6F);
+                    GlStateManager.rotate(-150F, 0f, 1f, 0f);
+                    GlStateManager.rotate(-6F, 1f, 0f, 0f);
+                    GlStateManager.rotate(-15F, 0f, 0f, 1f);
+                    GlStateManager.scale(0.75F, 0.75F, 0.75F);
+                })
+                .withMaxStackSize(6)
+                .withTextureName("Dummy.png")
+                .build(modContext, ItemMagazine.class);
+
 
         Magazines.FuelCell = new ItemMagazine.Builder().withCapacity(1000)
                 .withName("FuelCell")

@@ -21,7 +21,7 @@ public class FamasF1Factory implements GunFactory {
 
                 .withName("famas_f1")
                 .withFireRate(0.8f)
-                .withRecoil(2.5f)
+                .withRecoil(2.0f)
                 .withZoom(0.9f)
                 .withConfigGroup(GunConfigurationGroup.RIFLE)
                 .hasFlashPedals()

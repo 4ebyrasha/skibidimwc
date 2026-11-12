@@ -22,7 +22,7 @@ public class ARX160Factory implements GunFactory {
 
                 .withName("arx160")
                 .withFireRate(0.75f)
-                .withRecoil(2.5f)
+                .withRecoil(0.9f)
                 .withZoom(0.9f)
                 .withConfigGroup(GunConfigurationGroup.RIFLE)
                 .hasFlashPedals()
@@ -559,7 +559,7 @@ public class ARX160Factory implements GunFactory {
                                 })
 
                         .build())
-                .withSpawnEntityDamage(6f)
+                .withSpawnEntityDamage(23f)
                 .withSpawnEntityGravityVelocity(0.0118f)
 
 

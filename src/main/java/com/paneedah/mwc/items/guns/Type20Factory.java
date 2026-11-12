@@ -23,7 +23,7 @@ public class Type20Factory implements GunFactory {
 
                 .withName("type20")
                 .withFireRate(0.65f)
-                .withRecoil(3f)
+                .withRecoil(2.6f)
                 .withZoom(0.9f)
                 .withConfigGroup(GunConfigurationGroup.RIFLE)
                 .withMuzzlePosition(new Vec3d(0.0, -1.076000002264977, -6.227999991893772))

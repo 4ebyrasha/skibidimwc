@@ -32,6 +32,9 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
     private static final int DEFAULT_MAX_LIFETIME = 5000;
 
+    private static final double PROJECTILE_SPAWN_FORWARD_OFFSET = 0.35D;
+    private static final double PROJECTILE_SPAWN_BLOCK_MARGIN = 0.01D;
+
     private int xTile = -1;
     private int yTile = -1;
     private int zTile = -1;
@@ -93,34 +96,61 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             float shotYaw,
             float shotPitch
     ) {
-        double x = thrower.posX;
-        double y = thrower.posY + thrower.getEyeHeight();
-        double z = thrower.posZ;
+        double yawRadians = Math.toRadians(shotYaw);
+        double pitchRadians = Math.toRadians(shotPitch);
 
-        x -= Math.cos(shotYaw / 180 * Math.PI)
-                * (isAiming ? 0 : 0.16);
+        double cosPitch = Math.cos(pitchRadians);
 
-        y -= isAiming ? 0 : 0.1;
+        Vec3d direction = new Vec3d(
+                -Math.sin(yawRadians) * cosPitch,
+                -Math.sin(pitchRadians),
+                Math.cos(yawRadians) * cosPitch
+        );
 
-        z -= Math.sin(shotYaw / 180 * Math.PI)
-                * (isAiming ? 0 : 0.16);
+        Vec3d eyePosition = new Vec3d(
+                thrower.posX,
+                thrower.posY + thrower.getEyeHeight(),
+                thrower.posZ
+        );
+
+        Vec3d spawnPosition = eyePosition.add(
+                direction.scale(PROJECTILE_SPAWN_FORWARD_OFFSET)
+        );
+
+        RayTraceResult obstruction = world.rayTraceBlocks(
+                eyePosition,
+                spawnPosition,
+                false,
+                true,
+                false
+        );
+
+        if (obstruction != null
+                && obstruction.typeOfHit == RayTraceResult.Type.BLOCK) {
+
+            double safeDistance = Math.max(
+                    0.0D,
+                    eyePosition.distanceTo(obstruction.hitVec)
+                            - PROJECTILE_SPAWN_BLOCK_MARGIN
+            );
+
+            spawnPosition = eyePosition.add(
+                    direction.scale(safeDistance)
+            );
+        }
 
         setPositionAndRotation(
-                x,
-                y,
-                z,
+                spawnPosition.x,
+                spawnPosition.y,
+                spawnPosition.z,
                 shotYaw,
                 shotPitch
         );
 
-        motionX = -Math.sin(rotationYaw / 180 * Math.PI)
-                * Math.cos(rotationPitch / 180 * Math.PI);
-
-        motionY = -Math.sin(rotationPitch / 180 * Math.PI);
-
-        motionZ = Math.cos(rotationYaw / 180 * Math.PI)
-                * Math.cos(rotationPitch / 180 * Math.PI);
-
+        motionX = direction.x;
+        motionY = direction.y;
+        motionZ = direction.z;
+        
         setThrowableHeading(
                 motionX,
                 motionY,

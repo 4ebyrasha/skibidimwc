@@ -107,6 +107,8 @@ public class VSSVintorezFactory implements GunFactory {
                 })
                 .withCompatibleAttachment(Magazines.ASValMag, (model) -> {
                 })
+                .withCompatibleAttachment(Magazines.SR3MMag, (model) -> {
+                })
                 .withCompatibleAttachment(Attachments.PSO1, (player, stack) -> {
                     GlStateManager.translate(0.14F, -0.9F, -1.2F);
                     GlStateManager.scale(1.2F, 1.2F, 1.2F);
@@ -385,7 +387,12 @@ public class VSSVintorezFactory implements GunFactory {
                         )
 
                         .setupModernAnimations("vssvintorez", AuxiliaryAttachments.VSSVintorezAction)
-                        .setupModernMagazineAnimations("vssvintorez", Magazines.ASValMag, Magazines.VSSVintorezMag)
+                        .setupModernMagazineAnimations(
+                                "vssvintorez",
+                                Magazines.ASValMag,
+                                Magazines.VSSVintorezMag,
+                                Magazines.SR3MMag
+                        )
 
                         .withFirstPersonPositioningCustomRecoiled(AuxiliaryAttachments.VSSVintorezAction.getRenderablePart(), (renderContext) -> {
                             GlStateManager.translate(0f, 0f, 1f);
