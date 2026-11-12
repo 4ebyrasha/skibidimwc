@@ -343,6 +343,40 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         MC.getSoundHandler().playSound(psr);
     }
 
+    @SideOnly(Side.CLIENT)
+    private void playLocalGunshotSound(
+            SoundEvent sound,
+            float volume,
+            float pitch,
+            EntityLivingBase player
+    ) {
+        MC.getSoundHandler().playSound(
+                new GunshotPositionedSound(
+                        sound,
+                        SoundCategory.PLAYERS,
+                        volume,
+                        pitch,
+                        (float) player.posX,
+                        (float) player.posY,
+                        (float) player.posZ,
+                        ISound.AttenuationType.LINEAR
+                )
+        );
+    }
+
+    @SideOnly(Side.CLIENT)
+    private void playEndOfShootSound(SoundEvent sound) {
+        PositionedSoundRecord psr = new PositionedSoundRecord(
+                sound,
+                SoundCategory.PLAYERS,
+                1.0F,
+                1.0F,
+                MC.player.getPosition().up(5)
+        );
+
+        playShootSound(psr);
+    }
+
     private void fire(PlayerWeaponInstance weaponInstance) {
 
         EntityLivingBase player = weaponInstance.getPlayer();
@@ -353,7 +387,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         long clientShotTimestampNanos = System.nanoTime();
 
-        // РЎРѕС…СЂР°РЅСЏРµРј РЅР°РїСЂР°РІР»РµРЅРёРµ РїСЂРёС†РµР»Р° РґРѕ РїСЂРёРјРµРЅРµРЅРёСЏ РѕС‚РґР°С‡Рё.
+        // Сохраняем направление прицела до применения отдачи.
         float shotYaw = player.rotationYaw;
         float shotPitch = player.rotationPitch;
 
@@ -371,7 +405,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         boolean silencerOn =
                 modContext.getAttachmentAspect().isSilencerOn(weaponInstance);
 
-        // shooter's local sound
+        // Local shooter's sound.
         if (!FMLCommonHandler.instance().getSide().isServer()) {
 
             SoundEvent shooterSound = null;
@@ -429,17 +463,11 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                             ? weapon.getSilencedShootSoundVolume()
                             : weapon.getShootSoundVolume();
 
-                    playShootSound(
-                            new GunshotPositionedSound(
-                                    shooterSound,
-                                    SoundCategory.PLAYERS,
-                                    vol * 0.4f,
-                                    pitch,
-                                    (float) MC.player.posX,
-                                    (float) MC.player.posY,
-                                    (float) MC.player.posZ,
-                                    ISound.AttenuationType.LINEAR
-                            )
+                    playLocalGunshotSound(
+                            shooterSound,
+                            vol * 0.4f,
+                            pitch,
+                            player
                     );
                 }
             }
@@ -451,15 +479,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 && weapon.getEndOfShootSound() != null
                 && !FMLCommonHandler.instance().getSide().isServer()) {
 
-            PositionedSoundRecord psr = new PositionedSoundRecord(
-                    weapon.getEndOfShootSound(),
-                    SoundCategory.PLAYERS,
-                    1.0F,
-                    1.0F,
-                    MC.player.getPosition().up(5)
-            );
-
-            playShootSound(psr);
+            playEndOfShootSound(weapon.getEndOfShootSound());
         }
 
         if (currentAmmo == 1) {
@@ -480,7 +500,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         player.rotationYaw =
                 player.rotationYaw + recoilAmount * rotationYawFactor * 0.4f;
-
 
         if (ModernConfigManager.enableMuzzleEffects
                 && weapon.builder.flashIntensity > 0) {
