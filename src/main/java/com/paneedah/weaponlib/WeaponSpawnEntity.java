@@ -194,7 +194,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
                                 bulletPass.y,
                                 bulletPass.z,
                                 (byte) 0,
-                                1.5F,
+                                0.8F,
                                 whizzPitch,
                                 whizzMissDist,
                                 isSubsonic
@@ -240,7 +240,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
                                     crackPos.y,
                                     crackPos.z,
                                     (byte) 1,
-                                    0.4F,
+                                    0.25F,
                                     crackPitch,
                                     missDistForEffect,
                                     false
