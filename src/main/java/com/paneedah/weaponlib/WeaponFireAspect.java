@@ -44,6 +44,9 @@ import static com.paneedah.mwc.MWC.CHANNEL;
 import static com.paneedah.mwc.ProjectConstants.LOGGER;
 import static com.paneedah.mwc.proxies.ClientProxy.MC;
 
+import com.paneedah.mwc.client.audio.GunshotPositionedSound;
+import net.minecraft.client.audio.ISound;
+
 /*
  * On a client side this class is used from within
  * a separate client "ticker" thread.
@@ -426,10 +429,17 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                             ? weapon.getSilencedShootSoundVolume()
                             : weapon.getShootSoundVolume();
 
-                    MC.player.playSound(
-                            shooterSound,
-                            vol * 0.4f,
-                            pitch
+                    playShootSound(
+                            new GunshotPositionedSound(
+                                    shooterSound,
+                                    SoundCategory.PLAYERS,
+                                    vol * 0.4f,
+                                    pitch,
+                                    (float) MC.player.posX,
+                                    (float) MC.player.posY,
+                                    (float) MC.player.posZ,
+                                    ISound.AttenuationType.LINEAR
+                            )
                     );
                 }
             }

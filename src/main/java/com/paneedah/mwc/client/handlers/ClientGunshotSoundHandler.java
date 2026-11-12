@@ -24,6 +24,9 @@ import java.util.PriorityQueue;
 
 import static com.paneedah.mwc.ProjectConstants.LOGGER;
 
+import com.paneedah.mwc.client.audio.GunshotPositionedSound;
+import net.minecraft.client.audio.ISound;
+
 @Mod.EventBusSubscriber(Side.CLIENT)
 public final class ClientGunshotSoundHandler {
 
@@ -1069,29 +1072,32 @@ public final class ClientGunshotSoundHandler {
         float pitch = msg.getPitch();
 
         if (indoor) {
-            mc.player.world.playSound(
-                    mc.player,
-                    msg.getX(),
-                    msg.getY(),
-                    msg.getZ(),
-                    sound,
-                    SoundCategory.PLAYERS,
-                    volume,
-                    pitch
-            );
 
-        } else {
-
-            // positional sound without vanilla attenuation.
             mc.getSoundHandler().playSound(
-                    new NonAttenuatedPositionedSound(
+                    new GunshotPositionedSound(
                             sound,
                             SoundCategory.PLAYERS,
                             volume,
                             pitch,
                             (float) msg.getX(),
                             (float) msg.getY(),
-                            (float) msg.getZ()
+                            (float) msg.getZ(),
+                            ISound.AttenuationType.LINEAR
+                    )
+            );
+
+        } else {
+
+            mc.getSoundHandler().playSound(
+                    new GunshotPositionedSound(
+                            sound,
+                            SoundCategory.PLAYERS,
+                            volume,
+                            pitch,
+                            (float) msg.getX(),
+                            (float) msg.getY(),
+                            (float) msg.getZ(),
+                            ISound.AttenuationType.NONE
                     )
             );
         }

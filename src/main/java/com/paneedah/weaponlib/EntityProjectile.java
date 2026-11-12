@@ -150,7 +150,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         motionX = direction.x;
         motionY = direction.y;
         motionZ = direction.z;
-        
+
         setThrowableHeading(
                 motionX,
                 motionY,
