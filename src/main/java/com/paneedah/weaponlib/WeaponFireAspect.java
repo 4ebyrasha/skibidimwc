@@ -637,7 +637,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 1.0f,
                 clientShotTimestampNanos,
                 player.rotationYaw,
-                player.rotationPitch
+                player.rotationPitch,
+                -1L
         );
     }
 
@@ -669,10 +670,10 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
      * @param player shooter
      * @param isBurst whether this shot belongs to a burst
      * @param isAimed whether the weapon is aimed
-     * @param clientShotTimestampNanos original client timestamp, retained for audio
+     * @param clientShotTimestampNanos original client timestamp
      * @param shotYaw validated shot yaw
      * @param shotPitch validated shot pitch
-     * @param serverShotTimestampNanos translated and server-clamped shot timestamp
+     * @param serverShotTimestampNanos translated server timestamp
      */
     public void serverFire(
             EntityLivingBase player,
@@ -696,8 +697,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 serverShotTimestampNanos
         );
     }
-
-
 
     public void serverFire(
             EntityLivingBase player,
@@ -736,7 +735,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 damageMultiplier,
                 clientShotTimestampNanos,
                 player.rotationYaw,
-                player.rotationPitch
+                player.rotationPitch,
+                -1L
         );
     }
 
@@ -766,11 +766,24 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
     }
 
     /**
-     * Server-side weapon firing with a separate server-domain shot timestamp.
+     * Performs server-side weapon firing.
      *
-     * The client timestamp remains unchanged for remote gunshot audio timing.
-     * The server timestamp is attached to each physical projectile for later
-     * historical hit registration.
+     * <p>The original client timestamp is retained for remote audio.
+     * The translated server timestamp is used for historical hit registration.</p>
+     *
+     * <p>When historical shooter state is unavailable, projectiles use the
+     * current shooter position and historical target rewind is disabled.</p>
+     *
+     * @param player shooter
+     * @param itemStack weapon stack
+     * @param spawnEntityWith projectile factory
+     * @param isBurst whether this shot belongs to a burst
+     * @param isAimed whether the weapon is aimed
+     * @param damageMultiplier damage multiplier
+     * @param clientShotTimestampNanos original client timestamp
+     * @param shotYaw shot yaw
+     * @param shotPitch shot pitch
+     * @param serverShotTimestampNanos translated server timestamp
      */
     public void serverFire(
             EntityLivingBase player,
@@ -784,10 +797,14 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             float shotPitch,
             long serverShotTimestampNanos
     ) {
-
-        if (itemStack == null
+        if (player == null
+                || itemStack == null
                 || itemStack.isEmpty()
                 || !(itemStack.getItem() instanceof Weapon)) {
+            return;
+        }
+
+        if (player.world == null || player.world.isRemote || player.isDead) {
             return;
         }
 
@@ -803,7 +820,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         }
 
         if (DEBUG_GUNSHOT_TIMING) {
-
             int shooterId = player.getEntityId();
 
             Long previousClientTimestamp =
@@ -835,7 +851,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     formatTimingInterval(serverReceiveInterval),
                     serverShotTimestampNanos > 0L
                             ? formatTimingInterval(
-                            serverReceiveTimestampNanos - serverShotTimestampNanos
+                            serverReceiveTimestampNanos
+                                    - serverShotTimestampNanos
                     )
                             : "unavailable"
             );
@@ -848,12 +865,12 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         boolean silencerOn =
                 playerWeaponInstance != null
-                        && modContext.getAttachmentAspect().isSilencerOn(playerWeaponInstance);
+                        && modContext.getAttachmentAspect()
+                        .isSilencerOn(playerWeaponInstance);
 
         Random rand = player.getRNG();
 
         float pitch = 0.92f + rand.nextFloat() * 0.11f;
-
         float baseVol = weapon.getShootSoundVolume();
 
         boolean shooterIndoor = isShooterIndoor(player);
@@ -879,10 +896,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         }
 
         /*
-         * Resolve the shooter's eye position at the original shot timestamp.
-         *
-         * If historical data is unavailable, use the current position and disable
-         * target rewind for these projectiles.
+         * Resolve the historical shooter eye position.
+         * Never move the live player entity backwards in time.
          */
         Vec3d projectileOrigin = new Vec3d(
                 player.posX,
@@ -914,11 +929,12 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 );
 
                 historicalOriginAvailable = true;
+
             } else {
                 LOGGER.debug(
                         "[MWC Combat][WeaponFireAspect#serverFire] "
                                 + "Historical shooter origin unavailable; "
-                                + "projectile rewind disabled | Player={} | "
+                                + "rewind disabled | Player={} | "
                                 + "ShotTimestamp={} | StateAvailable={}",
                         serverPlayer.getUniqueID(),
                         serverShotTimestampNanos,
@@ -927,6 +943,10 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             }
         }
 
+        /*
+         * One projectile is created for each configured pellet.
+         * Catch-up is performed before the projectile is added to the world.
+         */
         for (int i = 0; i < weapon.builder.pellets; i++) {
 
             double damage = BalancePackManager.getNetGunDamage(weapon);
@@ -934,7 +954,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             double hipFireSpread = 2.6;
 
             if (BalancePackManager.hasActiveBalancePack()) {
-
                 hipFireSpread =
                         BalancePackManager.getGlobalHipFireSpread();
 
@@ -979,107 +998,48 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     projectileOrigin
             );
 
-            /*
-             * Simulate the projectile ticks that elapsed while the fire packet
-             * was travelling to the server.
-             *
-             * This keeps projectile position, ticksExisted and historical target
-             * timestamps on the same timeline.
-             */
             if (historicalOriginAvailable) {
-
                 long elapsedNanos =
-                        System.nanoTime() - serverShotTimestampNanos;
+                        Math.max(
+                                0L,
+                                System.nanoTime() - serverShotTimestampNanos
+                        );
 
                 int catchUpTicks = (int) Math.min(
                         MAX_PROJECTILE_CATCH_UP_TICKS,
-                        Math.max(0L, elapsedNanos / COMBAT_TICK_NANOS)
+                        elapsedNanos / COMBAT_TICK_NANOS
                 );
 
                 for (int tick = 0;
                      tick < catchUpTicks && !bullet.isDead;
                      tick++) {
-
                     bullet.onUpdate();
                 }
 
                 LOGGER.debug(
                         "[MWC Combat][WeaponFireAspect#serverFire] "
-                                + "Projectile catch-up completed | Player={} | "
+                                + "Projectile catch-up completed | "
+                                + "Player={} | Pellet={}/{} | "
                                 + "CatchUpTicks={} | ShotAgeMs={} | Dead={}",
                         player.getUniqueID(),
+                        i + 1,
+                        weapon.builder.pellets,
                         catchUpTicks,
                         elapsedNanos / 1_000_000.0D,
                         bullet.isDead
                 );
             }
 
-            /*
-             * A projectile that already hit something during catch-up must not
-             * be inserted into the world again.
-             */
             if (!bullet.isDead) {
                 player.world.spawnEntity(bullet);
             }
         }
 
-        for (int i = 0; i < weapon.builder.pellets; i++) {
-
-            double damage = BalancePackManager.getNetGunDamage(weapon);
-
-            double hipFireSpread = 2.6;
-
-            if (BalancePackManager.hasActiveBalancePack()) {
-
-                hipFireSpread =
-                        BalancePackManager.getGlobalHipFireSpread();
-
-                hipFireSpread *=
-                        BalancePackManager.getGroupHipFireSpread(
-                                weapon.getConfigurationGroup()
-                        );
-            }
-
-            damage *= damageMultiplier;
-
-            WeaponSpawnEntity bullet = new WeaponSpawnEntity(
-                    weapon,
-                    player.world,
-                    player,
-                    weapon.getSpawnEntityVelocity(),
-                    weapon.getSpawnEntityGravityVelocity(),
-                    BalancePackManager.getInaccuracy(weapon)
-                            + (isAimed ? 0.0f : (float) hipFireSpread),
-                    (float) damage,
-                    weapon.getSpawnEntityExplosionRadius(),
-                    weapon.isDestroyingBlocks(),
-                    weapon.hasRocketParticles(),
-                    weapon.getParticleAgeCoefficient(),
-                    weapon.getSmokeParticleAgeCoefficient(),
-                    weapon.getExplosionScaleCoefficient(),
-                    weapon.getSmokeParticleScaleCoefficient(),
-                    0,
-                    0
-            );
-
-            bullet.setServerShotTimestampNanos(
-                    historicalOriginAvailable
-                            ? serverShotTimestampNanos
-                            : -1L
-            );
-
-            bullet.setPositionAndDirectionFromShot(
-                    isAimed,
-                    shotYaw,
-                    shotPitch,
-                    projectileOrigin
-            );
-
-            player.world.spawnEntity(bullet);
-        }
-
+        /*
+         * Broadcast the gunshot to nearby players.
+         * Audio continues to use the original client timestamp.
+         */
         for (EntityPlayer other : player.world.playerEntities) {
-
             if (other == player) {
                 continue;
             }
@@ -1090,33 +1050,28 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     player.posZ
             );
 
-            if (distanceSq > maxDistSq) {
+            if (distanceSq > maxDistSq || !(other instanceof EntityPlayerMP)) {
                 continue;
             }
 
-            boolean showMuzzleFlash =
-                    distanceSq <= 10000.0;
+            boolean showMuzzleFlash = distanceSq <= 10000.0;
 
-            GunshotSoundMessage message =
-                    new GunshotSoundMessage(
-                            player.posX,
-                            player.posY + player.getEyeHeight(),
-                            player.posZ,
-                            Item.getIdFromItem(weapon),
-                            silencerOn,
-                            isBurst,
-                            shooterIndoor,
-                            pitch,
-                            baseVol,
-                            player.getEntityId(),
-                            showMuzzleFlash,
-                            clientShotTimestampNanos
-                    );
-
-            CHANNEL.sendTo(
-                    message,
-                    (EntityPlayerMP) other
+            GunshotSoundMessage message = new GunshotSoundMessage(
+                    player.posX,
+                    player.posY + player.getEyeHeight(),
+                    player.posZ,
+                    Item.getIdFromItem(weapon),
+                    silencerOn,
+                    isBurst,
+                    shooterIndoor,
+                    pitch,
+                    baseVol,
+                    player.getEntityId(),
+                    showMuzzleFlash,
+                    clientShotTimestampNanos
             );
+
+            CHANNEL.sendTo(message, (EntityPlayerMP) other);
         }
 
         TargetPoint tp = new TargetPoint(
@@ -1128,7 +1083,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
 
         if (playerWeaponInstance != null) {
-
             final Vector3F weaponDir = VectorUtil.convertToVector3F(
                     new Vec3d(0, -0.1, 1)
                             .rotatePitch((float) Math.toRadians(-player.rotationPitch))
