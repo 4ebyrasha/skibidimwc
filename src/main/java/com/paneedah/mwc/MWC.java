@@ -1,6 +1,8 @@
 package com.paneedah.mwc;
 
 import com.cheba.Run;
+import com.cheba.combat.handlers.CombatHistoryEventHandler;
+import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.effect.BulletSuppressionEffect;
 import com.cheba.m.GuiHandler;
 import com.paneedah.mwc.creativetab.*;
@@ -24,6 +26,7 @@ import dev.redstudio.redcore.utils.OptiNotFine;
 import net.minecraft.block.material.Material;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
@@ -79,6 +82,8 @@ public final class MWC {
     @Mod.EventHandler
     public void init(FMLInitializationEvent initializationEvent) {
         MinecraftForge.EVENT_BUS.register(CommonEventHandler.class);
+        MinecraftForge.EVENT_BUS.register(CombatHistoryEventHandler.class);
+        FMLCommonHandler.instance().bus().register(CombatHistoryEventHandler.class);
 
         MWCRecipes.register();
         commonProxy.init(this);

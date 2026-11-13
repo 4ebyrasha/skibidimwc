@@ -13,46 +13,46 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Integrates server-authoritative player movement tracking with Minecraft's
- * vanilla network handler.
+ * Connects vanilla server-side player movement processing to the combat
+ * history system.
  *
- * <p>Snapshots are recorded only after the server has accepted and applied
- * a movement packet. This prevents client-provided, rejected coordinates
- * from entering combat history.</p>
+ * <p>The mixin observes movement processing without replacing or modifying
+ * vanilla movement validation. A snapshot is recorded only after vanilla
+ * updates the last accepted Z coordinate.</p>
  *
- * <p>Server-side position corrections invalidate the previous history.
- * A correction creates a discontinuity in the player's movement timeline,
- * so snapshots from before it must not be used for hit registration.</p>
+ * <p>Server-authoritative position corrections invalidate the existing
+ * history because snapshots on opposite sides of a teleport or correction
+ * must never be interpolated as one continuous movement sequence.</p>
  *
- * <p>This mixin does not modify player movement, packet validation,
- * collision handling, or vanilla teleport behavior.</p>
+ * <p>All callbacks execute as part of the server-side network handler.
+ * The history manager is therefore expected to be accessed exclusively
+ * from the logical server thread.</p>
  */
 @Mixin(NetHandlerPlayServer.class)
 public abstract class NetHandlerPlayServerMixin {
 
     /**
-     * Player associated with this network handler.
+     * The player controlled by this network handler.
      *
-     * <p>The field is owned by {@link NetHandlerPlayServer}; this shadow
-     * exists only to access the player from injected callbacks.</p>
+     * <p>This field is owned by {@link NetHandlerPlayServer}. The shadow
+     * declaration mirrors its visibility and type.</p>
      */
     @Shadow
-    EntityPlayerMP player;
+    public EntityPlayerMP player;
 
     /**
-     * Records a snapshot after vanilla has successfully updated its last
-     * accepted player position.
+     * Records the player's authoritative state after an accepted movement
+     * packet has updated vanilla's {@code lastGoodZ} field.
      *
-     * <p>The injection is deliberately placed after the write to
-     * {@code lastGoodZ}. In the vanilla movement handler, this write occurs
-     * in the accepted movement path. Rejected movement packets return before
-     * reaching it.</p>
+     * <p>The injection is placed after the field write, rather than at the
+     * beginning or end of {@code processPlayer}. This avoids recording
+     * client-provided positions from movement packets rejected by vanilla.</p>
      *
-     * <p>{@code processPlayer} is invoked on the server thread after
-     * {@code PacketThreadUtil.checkThreadAndEnqueue} has completed its
-     * scheduling handoff.</p>
+     * <p>Vanilla first uses {@code PacketThreadUtil.checkThreadAndEnqueue}
+     * to transfer packet processing to the server thread. Consequently,
+     * this callback records state on the logical server thread.</p>
      *
-     * @param packetIn the movement packet currently being processed
+     * @param packetIn movement packet being processed by vanilla
      * @param callbackInfo Mixin callback context
      */
     @Inject(
@@ -83,24 +83,22 @@ public abstract class NetHandlerPlayServerMixin {
     }
 
     /**
-     * Invalidates the player's previous movement history before vanilla
-     * applies a server-authoritative position correction or teleport.
+     * Invalidates movement history before vanilla applies a server-side
+     * position correction.
      *
-     * <p>The six-argument overload is the implementation that accepts
-     * relative position and rotation flags. Vanilla's five-argument overload
-     * delegates to it, so this hook covers both call paths without duplicate
-     * injections.</p>
+     * <p>The six-argument overload is the implementation accepting relative
+     * position and rotation flags. The five-argument overload delegates to
+     * it, so injecting into this implementation covers both call paths.</p>
      *
-     * <p>Invalidation is required because a teleport or correction breaks
-     * continuity between the previous snapshots and the new position.</p>
+     * <p>Invalidation prevents historical hit registration from using
+     * positions recorded before a discontinuity in the player's movement.</p>
      *
-     * @param x target X coordinate
-     * @param y target Y coordinate
-     * @param z target Z coordinate
-     * @param yaw target yaw
-     * @param pitch target pitch
-     * @param relativeSet position and rotation components interpreted
-     *                    relative to the player's current state
+     * @param x requested X coordinate
+     * @param y requested Y coordinate
+     * @param z requested Z coordinate
+     * @param yaw requested yaw
+     * @param pitch requested pitch
+     * @param relativeSet flags describing relative position and rotation
      * @param callbackInfo Mixin callback context
      */
     @Inject(
