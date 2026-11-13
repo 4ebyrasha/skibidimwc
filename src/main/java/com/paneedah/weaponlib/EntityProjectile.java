@@ -206,6 +206,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      */
     public void onUpdate() {
         if (ticksExisted > MAX_TICKS) {
+            setDead(); // истекшие пули теперь удаляются из мира
             return;
         }
 
