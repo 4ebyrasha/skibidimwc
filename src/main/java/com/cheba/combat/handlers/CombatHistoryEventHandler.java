@@ -2,21 +2,14 @@ package com.cheba.combat.handlers;
 
 import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
+import com.cheba.combat.time.CombatClockSyncManager;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.FMLServerStoppedEvent;
 
 /**
- * Handles player and server lifecycle events for combat history.
- *
- * <p>Movement snapshots are temporary server-side data. They must not
- * survive player disconnection, death, dimension changes, or server
- * shutdown.</p>
- *
- * <p>Player lifecycle events are received from the Forge event bus.
- * Server shutdown is received from the FML event bus.</p>
+ * Handles lifecycle cleanup for combat history and clock synchronization.
  */
 public final class CombatHistoryEventHandler {
 
@@ -24,9 +17,9 @@ public final class CombatHistoryEventHandler {
     }
 
     /**
-     * Removes all historical snapshots when a player disconnects.
+     * Removes player-specific combat data when the player disconnects.
      *
-     * @param event Forge player logout event
+     * @param event player logout event
      */
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
@@ -37,15 +30,19 @@ public final class CombatHistoryEventHandler {
         EntityPlayerMP player = (EntityPlayerMP) event.player;
 
         CombatHistoryManager.remove(player.getUniqueID());
+        CombatClockSyncManager.remove(player.getUniqueID());
+
+        CombatLog.debug(
+                "CombatHistoryEventHandler",
+                "onPlayerLogout",
+                "Player combat state removed | Player=" + player.getUniqueID()
+        );
     }
 
     /**
-     * Removes historical snapshots when a player dies.
+     * Removes movement history when a player dies.
      *
-     * <p>A dead player's previous movement history must not be reused
-     * after respawn. The respawned player starts with a fresh history.</p>
-     *
-     * @param event Forge living entity death event
+     * @param event living entity death event
      */
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
@@ -59,13 +56,9 @@ public final class CombatHistoryEventHandler {
     }
 
     /**
-     * Removes historical snapshots after a player changes dimension.
+     * Invalidates movement history after a dimension change.
      *
-     * <p>Coordinates from different dimensions do not belong to the same
-     * spatial timeline. A new history will be created when the player
-     * submits the next accepted movement packet.</p>
-     *
-     * @param event Forge player dimension-change event
+     * @param event player dimension-change event
      */
     @SubscribeEvent
     public static void onPlayerChangedDimension(
@@ -84,19 +77,19 @@ public final class CombatHistoryEventHandler {
     }
 
     /**
-     * Clears all combat histories when the dedicated or integrated server
-     * has fully stopped.
+     * Clears all combat state when the server stops.
      *
-     * @param event FML server stopped event
+     * @param event server stopped event
      */
     @SubscribeEvent
     public static void onServerStopped(FMLServerStoppedEvent event) {
         CombatHistoryManager.clear();
+        CombatClockSyncManager.clear();
 
         CombatLog.info(
                 "CombatHistoryEventHandler",
                 "onServerStopped",
-                "Combat history cleanup completed"
+                "Combat history and clock synchronization cleanup completed"
         );
     }
 }
