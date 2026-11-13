@@ -6,9 +6,9 @@
 !/.gitattributes
 !/LICENSE
 !/README.md
-!/build.gradle
+!/build.gradle.kts
 !/gradle.properties
-!/settings.gradle
+!/settings.gradle.kts
 !/gradlew
 !/gradlew.bat
 !/gradle/
