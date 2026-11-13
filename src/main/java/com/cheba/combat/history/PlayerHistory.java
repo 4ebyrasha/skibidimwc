@@ -34,7 +34,7 @@ public final class PlayerHistory {
      * continuous movement history. Interpolating across such a gap could
      * produce a position that the player never occupied.</p>
      */
-    private static final long MAX_INTERPOLATION_GAP_NANOS = 250_000_000L;
+    static final long MAX_INTERPOLATION_GAP_NANOS = 250_000_000L;
 
     private final Deque<PlayerSnapshot> snapshots = new ArrayDeque<>();
 

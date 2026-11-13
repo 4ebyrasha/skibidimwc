@@ -15,13 +15,12 @@ import java.util.UUID;
  * server-side movement states.</p>
  *
  * <p>All methods that access the internal map or its histories must be
- * called from the logical server thread. This class intentionally does
- * not synchronize its data structures: Minecraft entity state and the
- * movement history are both owned by the server thread.</p>
+ * called from the logical server thread. Minecraft entity state and
+ * movement history are both owned by that thread.</p>
  *
- * <p>All timestamps passed to or returned from this manager belong to the
- * server's {@link System#nanoTime()} time domain. Client timestamps must
- * never be passed directly to historical queries.</p>
+ * <p>All timestamps belong to the server's {@link System#nanoTime()}
+ * time domain. Client timestamps must never be passed directly to
+ * historical queries.</p>
  */
 public final class CombatHistoryManager {
 
@@ -33,9 +32,12 @@ public final class CombatHistoryManager {
     /**
      * Captures the current authoritative state of a player.
      *
-     * <p>This method must be called after the server has accepted and
-     * applied the corresponding movement update. It must not be called
-     * with coordinates supplied directly by an untrusted client.</p>
+     * <p>The caller must invoke this method after the server has accepted
+     * and applied the corresponding movement update.</p>
+     *
+     * <p>The interval between consecutive snapshots is measured for
+     * diagnostics. Gaps exceeding the interpolation limit are reported
+     * because historical queries cannot safely interpolate across them.</p>
      *
      * @param player server-side player whose state should be recorded
      */
@@ -52,26 +54,29 @@ public final class CombatHistoryManager {
                 id -> new PlayerHistory()
         );
 
-        PlayerSnapshot snapshot = new PlayerSnapshot(
-                player,
-                System.nanoTime()
-        );
+        PlayerSnapshot previousSnapshot = history.getLatest();
+        PlayerSnapshot snapshot;
 
-        if (history.add(snapshot)) {
-            CombatLog.debug(
+        try {
+            snapshot = new PlayerSnapshot(player, System.nanoTime());
+        } catch (IllegalArgumentException exception) {
+            CombatLog.warn(
                     "CombatHistoryManager",
                     "recordSnapshot",
                     "Player=" + playerId
-                            + " | Snapshot saved"
-                            + " | Dimension=" + snapshot.getDimension()
-                            + " | Position=" + snapshot.getX()
-                            + ", " + snapshot.getY()
-                            + ", " + snapshot.getZ()
-                            + " | Rotation=" + snapshot.getYaw()
-                            + ", " + snapshot.getPitch()
-                            + " | HistorySize=" + history.size()
+                            + " | Snapshot rejected"
+                            + " | Reason=invalid_player_state"
+                            + " | Details=" + exception.getMessage()
             );
-        } else {
+            return;
+        }
+
+        long intervalNanos = previousSnapshot == null
+                ? -1L
+                : snapshot.getTimestampNanos()
+                - previousSnapshot.getTimestampNanos();
+
+        if (!history.add(snapshot)) {
             CombatLog.warn(
                     "CombatHistoryManager",
                     "recordSnapshot",
@@ -79,6 +84,53 @@ public final class CombatHistoryManager {
                             + " | Snapshot rejected"
                             + " | Reason=non_monotonic_timestamp"
                             + " | Timestamp=" + snapshot.getTimestampNanos()
+            );
+            return;
+        }
+
+        if (previousSnapshot == null) {
+            CombatLog.debug(
+                    "CombatHistoryManager",
+                    "recordSnapshot",
+                    "Player=" + playerId
+                            + " | First snapshot saved"
+                            + " | Dimension=" + snapshot.getDimension()
+                            + " | HistorySize=" + history.size()
+            );
+            return;
+        }
+
+        double intervalMillis = intervalNanos / 1_000_000.0D;
+        boolean interpolationGap =
+                intervalNanos > PlayerHistory.MAX_INTERPOLATION_GAP_NANOS;
+
+        if (interpolationGap) {
+            CombatLog.warn(
+                    "CombatHistoryManager",
+                    "recordSnapshot",
+                    "Player=" + playerId
+                            + " | Snapshot saved after timeline gap"
+                            + " | GapMs=" + intervalMillis
+                            + " | InterpolationLimitMs="
+                            + PlayerHistory.MAX_INTERPOLATION_GAP_NANOS
+                            / 1_000_000.0D
+                            + " | HistoricalInterpolation=Unavailable"
+                            + " | HistorySize=" + history.size()
+            );
+        } else {
+            CombatLog.debug(
+                    "CombatHistoryManager",
+                    "recordSnapshot",
+                    "Player=" + playerId
+                            + " | Snapshot saved"
+                            + " | IntervalMs=" + intervalMillis
+                            + " | Dimension=" + snapshot.getDimension()
+                            + " | Position=" + snapshot.getX()
+                            + ", " + snapshot.getY()
+                            + ", " + snapshot.getZ()
+                            + " | Rotation=" + snapshot.getYaw()
+                            + ", " + snapshot.getPitch()
+                            + " | HistorySize=" + history.size()
             );
         }
     }
@@ -91,7 +143,7 @@ public final class CombatHistoryManager {
      * long)} for ordinary historical queries.</p>
      *
      * @param playerId UUID of the player
-     * @return player's history, or {@code null} if no history exists
+     * @return player's history, or null if no history exists
      */
     public static PlayerHistory getHistory(UUID playerId) {
         if (playerId == null) {
@@ -104,14 +156,9 @@ public final class CombatHistoryManager {
     /**
      * Resolves a player's historical state at the requested server time.
      *
-     * <p>The state is interpolated between neighboring snapshots when
-     * necessary. Requests outside the retained time range return
-     * {@code null}; no extrapolation is performed.</p>
-     *
      * @param playerId UUID of the target player
-     * @param timestampNanos requested timestamp from the server's
-     *                       monotonic time domain
-     * @return historical state, or {@code null} if unavailable
+     * @param timestampNanos requested timestamp in the server time domain
+     * @return historical state, or null if unavailable
      */
     public static HistoricalPlayerState getHistoricalState(
             UUID playerId,
@@ -131,12 +178,7 @@ public final class CombatHistoryManager {
     }
 
     /**
-     * Invalidates a player's history after a discontinuity in its movement
-     * timeline.
-     *
-     * <p>The next accepted movement snapshot creates a new history.
-     * Typical reasons include server position corrections and dimension
-     * changes.</p>
+     * Invalidates a player's history after a movement timeline discontinuity.
      *
      * @param playerId UUID of the player
      * @param reason diagnostic reason for invalidation
@@ -160,10 +202,7 @@ public final class CombatHistoryManager {
     }
 
     /**
-     * Removes a player's history permanently from the registry.
-     *
-     * <p>Used when the player disconnects or dies. A later login or respawn
-     * starts with a new history.</p>
+     * Removes a player's history from the registry.
      *
      * @param playerId UUID of the player
      */
@@ -184,9 +223,7 @@ public final class CombatHistoryManager {
     }
 
     /**
-     * Removes every player history.
-     *
-     * <p>Called during server shutdown to release all retained snapshots.</p>
+     * Removes every player history during server shutdown.
      */
     public static void clear() {
         int removedHistories = HISTORIES.size();
