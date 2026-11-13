@@ -7,6 +7,7 @@ import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 
 import static com.paneedah.mwc.ProjectConstants.NAME;
 
@@ -43,8 +44,19 @@ public class MWCPlugin implements IFMLLoadingPlugin, IEarlyMixinLoader {
         return null;
     }
 
+    /**
+     * Returns the mixin configurations loaded during early Mixin initialization.
+     *
+     * <p>The main configuration contains existing client-side MWC mixins.
+     * The combat configuration contains server-side movement history hooks.</p>
+     *
+     * @return early mixin configuration resource names
+     */
     @Override
     public List<String> getMixinConfigs() {
-        return Collections.singletonList("mixin.mwc.json");
+        return Arrays.asList(
+                "mixin.mwc.json",
+                "mixin.combat.json"
+        );
     }
 }
