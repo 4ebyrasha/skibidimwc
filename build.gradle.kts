@@ -75,9 +75,13 @@ dependencies {
     annotationProcessor("com.google.guava:guava:32.1.2-jre")
     annotationProcessor("com.google.code.gson:gson:2.8.9")
 
-    val mixinBooterFile = files("libs/mixinbooter-10.7.jar")
-    api(mixinBooterFile)
-    annotationProcessor(mixinBooterFile)
+    val mixinBooter = modUtils.enableMixins(
+        files("libs/mixinbooter-10.7.jar"),
+        "mixins.mwc.refmap.json"
+    )
+
+    api(mixinBooter)
+    annotationProcessor(mixinBooter)
 }
 
 buildConfig {
