@@ -1,5 +1,6 @@
 package com.cheba.combat.handlers;
 
+import com.cheba.combat.fire.ServerFireRateLimiter;
 import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
@@ -12,12 +13,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
  * Handles combat history recording and lifecycle cleanup.
- *
- * <p>Player snapshots are recorded at the end of every server player tick.
- * Accepted movement packets may also produce additional snapshots.</p>
- *
- * <p>Player connection and tick events are received through the FML event
- * bus. Living entity death events are received through the Forge event bus.</p>
  */
 public final class CombatHistoryEventHandler {
 
@@ -26,12 +21,6 @@ public final class CombatHistoryEventHandler {
 
     /**
      * Records the final authoritative player state for the current tick.
-     *
-     * <p>This ensures that stationary players also have a continuous
-     * historical timeline instead of relying exclusively on movement
-     * packets.</p>
-     *
-     * @param event player tick event
      */
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
@@ -47,8 +36,6 @@ public final class CombatHistoryEventHandler {
 
     /**
      * Removes player-specific combat data when the player disconnects.
-     *
-     * @param event player logout event
      */
     @SubscribeEvent
     public static void onPlayerLogout(
@@ -62,6 +49,7 @@ public final class CombatHistoryEventHandler {
 
         CombatHistoryManager.remove(player.getUniqueID());
         CombatClockSyncManager.remove(player.getUniqueID());
+        ServerFireRateLimiter.remove(player.getUniqueID());
 
         CombatLog.debug(
                 "CombatHistoryEventHandler",
@@ -72,11 +60,6 @@ public final class CombatHistoryEventHandler {
 
     /**
      * Removes movement history when a player dies.
-     *
-     * <p>Clock synchronization remains valid because death does not
-     * change the client's or server's monotonic clock.</p>
-     *
-     * @param event living entity death event
      */
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
@@ -91,8 +74,6 @@ public final class CombatHistoryEventHandler {
 
     /**
      * Invalidates movement history after a player changes dimension.
-     *
-     * @param event player dimension-change event
      */
     @SubscribeEvent
     public static void onPlayerChangedDimension(
@@ -112,18 +93,17 @@ public final class CombatHistoryEventHandler {
 
     /**
      * Clears all combat state when the server stops.
-     *
-     * @param event server stopped event
      */
     @SubscribeEvent
     public static void onServerStopped(FMLServerStoppedEvent event) {
         CombatHistoryManager.clear();
         CombatClockSyncManager.clear();
+        ServerFireRateLimiter.clear();
 
         CombatLog.info(
                 "CombatHistoryEventHandler",
                 "onServerStopped",
-                "Combat history and clock synchronization cleanup completed"
+                "Combat history, clock synchronization and fire-rate state cleared"
         );
     }
 }

@@ -1,13 +1,16 @@
 package com.paneedah.mwc.network.handlers;
 
+import com.cheba.combat.fire.ServerFireRateLimiter;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.TryFireMessage;
+import com.paneedah.weaponlib.Weapon;
 import com.paneedah.weaponlib.WeaponFireAspect;
 import dev.redstudio.redcore.utils.NetworkUtil;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
@@ -38,7 +41,21 @@ public final class TryFireMessageHandler
             }
 
             EntityPlayerMP player = context.getServerHandler().player;
-            if (player == null || player.isDead) {
+
+            if (player == null || player.isDead || fireManager == null) {
+                return;
+            }
+
+            ItemStack heldStack = player.getHeldItemMainhand();
+
+            if (heldStack.isEmpty()
+                    || !(heldStack.getItem() instanceof Weapon)) {
+                CombatLog.debug(
+                        "TryFireMessageHandler",
+                        "onMessage",
+                        "Fire request rejected: no weapon in main hand"
+                                + " | Player=" + player.getUniqueID()
+                );
                 return;
             }
 
@@ -61,12 +78,17 @@ public final class TryFireMessageHandler
                 estimatedServerShotNanos = serverPacketReceiveNanos;
             }
 
-            long oldestAllowedTimestamp =
-                    Math.max(1L, serverPacketReceiveNanos - MAX_REWIND_NANOS);
+            long oldestAllowedTimestamp = Math.max(
+                    1L,
+                    serverPacketReceiveNanos - MAX_REWIND_NANOS
+            );
 
             long serverShotTimestampNanos = Math.max(
                     oldestAllowedTimestamp,
-                    Math.min(estimatedServerShotNanos, serverPacketReceiveNanos)
+                    Math.min(
+                            estimatedServerShotNanos,
+                            serverPacketReceiveNanos
+                    )
             );
 
             float shotYaw = player.rotationYaw;
@@ -96,9 +118,19 @@ public final class TryFireMessageHandler
                             + " | ServerReceiveNanos=" + serverPacketReceiveNanos
                             + " | ServerShotNanos=" + serverShotTimestampNanos
                             + " | RewindMs="
-                            + ((serverPacketReceiveNanos - serverShotTimestampNanos)
-                            / 1_000_000.0D)
+                            + (serverPacketReceiveNanos - serverShotTimestampNanos)
+                            / 1_000_000.0D
             );
+
+            Weapon weapon = (Weapon) heldStack.getItem();
+
+            if (!ServerFireRateLimiter.tryAccept(
+                    player,
+                    weapon,
+                    serverShotTimestampNanos
+            )) {
+                return;
+            }
 
             fireManager.serverFire(
                     player,
