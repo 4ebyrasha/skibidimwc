@@ -20,6 +20,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cheba.combat.history.CombatHistoryManager;
@@ -350,9 +351,9 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      * Server-side players are checked against historical bounding boxes when
      * a valid synchronized shot timestamp and historical state are available.</p>
      *
-     * <p>The projectile itself is never rewound. Only the target bounding box
-     * used for collision detection is historical. The returned entity remains
-     * the current live entity, allowing the normal damage pipeline to run.</p>
+     * <p>All players in the current world are considered, even when their
+     * current bounding boxes are far from the projectile. This is necessary
+     * because their historical positions may intersect the projectile segment.</p>
      *
      * @param vec3 segment start
      * @param vec31 segment end, already clipped against block collision
@@ -374,15 +375,28 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
         EntityLivingBase shooter = getThrower();
 
-        List<Entity> entities = world.getEntitiesWithinAABBExcludingEntity(
-                this,
-                getEntityBoundingBox()
-                        .expand(motionX, motionY, motionZ)
-                        .expand(1.0D, 1.0D, 1.0D)
+        List<Entity> entities = new ArrayList<>(
+                world.getEntitiesWithinAABBExcludingEntity(
+                        this,
+                        getEntityBoundingBox()
+                                .expand(motionX, motionY, motionZ)
+                                .expand(1.0D, 1.0D, 1.0D)
+                )
         );
 
-        RayTraceResult nearestHit = null;
-        double nearestDistanceSquared = Double.MAX_VALUE;
+        /*
+         * Historical player positions can be outside the current projectile
+         * search box. Add every player in this world to the candidate list.
+         *
+         * The contains check prevents processing players twice.
+         */
+        if (!world.isRemote) {
+            for (EntityPlayer player : world.playerEntities) {
+                if (!entities.contains(player)) {
+                    entities.add(player);
+                }
+            }
+        }
 
         long shotTimestampNanos = -1L;
 
@@ -391,8 +405,11 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     ((WeaponSpawnEntity) this).getServerShotTimestampNanos();
         }
 
+        RayTraceResult nearestHit = null;
+        double nearestDistanceSquared = Double.MAX_VALUE;
+
         for (Entity target : entities) {
-            if (target == null || target == shooter) {
+            if (target == null) {
                 continue;
             }
 
@@ -414,17 +431,18 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 continue;
             }
 
+            /*
+             * Preserve the original shooter collision grace period.
+             * The shooter can become a collision target after five ticks.
+             */
             if (target == shooter && ticksInAir < 5) {
                 continue;
             }
 
-            AxisAlignedBB collisionBox = null;
-
             /*
              * Historical collision is only available for server-side players.
-             * If history is available at the segment midpoint, the current
-             * player bounding box must not be used as a fallback merely because
-             * the historical box was not intersected.
+             * A valid historical state prevents fallback to the player's
+             * current position, even when the historical box was not hit.
              */
             if (target instanceof EntityPlayerMP
                     && shotTimestampNanos > 0L) {
@@ -433,7 +451,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
                 long segmentStartNanos =
                         shotTimestampNanos
-                                + Math.max(0L, ticksExisted - 1L) * 50_000_000L;
+                                + Math.max(0L, ticksExisted - 1L)
+                                * 50_000_000L;
 
                 long segmentEndNanos =
                         segmentStartNanos + 50_000_000L;
@@ -472,21 +491,20 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                         }
                     }
 
-                    // A valid historical state exists: do not test the
-                    // player's current position for this projectile segment.
                     continue;
                 }
             }
 
             /*
-             * Fallback for non-player entities and players without usable
-             * historical data.
+             * Fallback for non-player entities and players without
+             * usable historical data.
              */
-            collisionBox = target.getEntityBoundingBox().expand(
-                    0.15D,
-                    0.15D,
-                    0.15D
-            );
+            AxisAlignedBB collisionBox =
+                    target.getEntityBoundingBox().expand(
+                            0.15D,
+                            0.15D,
+                            0.15D
+                    );
 
             RayTraceResult hit = collisionBox.calculateIntercept(start, end);
 
@@ -510,10 +528,9 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      * historical bounding box.
      *
      * <p>The collision time depends on the intersection position along the
-     * segment. The method therefore performs a few refinement iterations:
-     * it first samples the historical state at the segment midpoint, obtains
-     * an intersection, and then resolves the state at the estimated impact
-     * time.</p>
+     * segment. The method therefore performs several refinement iterations:
+     * it samples the historical state, obtains an intersection, and then
+     * resolves the state at the estimated impact time.</p>
      *
      * @param player current live player entity
      * @param start projectile segment start
@@ -575,6 +592,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
         return new RayTraceResult(player, intersection.hitVec);
     }
+
 
 
     /**
