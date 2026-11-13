@@ -8,17 +8,41 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
- * Handles lifecycle cleanup for combat history and clock synchronization.
+ * Handles combat history recording and lifecycle cleanup.
  *
- * <p>Player connection and dimension events are received through the
- * FML event bus. Living entity death events are received through the
- * Forge event bus.</p>
+ * <p>Player snapshots are recorded at the end of every server player tick.
+ * Accepted movement packets may also produce additional snapshots.</p>
+ *
+ * <p>Player connection and tick events are received through the FML event
+ * bus. Living entity death events are received through the Forge event bus.</p>
  */
 public final class CombatHistoryEventHandler {
 
     private CombatHistoryEventHandler() {
+    }
+
+    /**
+     * Records the final authoritative player state for the current tick.
+     *
+     * <p>This ensures that stationary players also have a continuous
+     * historical timeline instead of relying exclusively on movement
+     * packets.</p>
+     *
+     * @param event player tick event
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END
+                || !(event.player instanceof EntityPlayerMP)) {
+            return;
+        }
+
+        CombatHistoryManager.recordSnapshot(
+                (EntityPlayerMP) event.player
+        );
     }
 
     /**
@@ -66,7 +90,7 @@ public final class CombatHistoryEventHandler {
     }
 
     /**
-     * Invalidates movement history after a dimension change.
+     * Invalidates movement history after a player changes dimension.
      *
      * @param event player dimension-change event
      */
