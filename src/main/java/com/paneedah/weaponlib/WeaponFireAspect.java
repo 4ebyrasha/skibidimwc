@@ -609,11 +609,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
-    public void serverFire(
-            EntityLivingBase player,
-            boolean isBurst,
-            boolean isAimed
-    ) {
+    public void serverFire(EntityLivingBase player, boolean isBurst, boolean isAimed) {
         serverFire(
                 player,
                 isBurst,
@@ -622,12 +618,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
-    public void serverFire(
-            EntityLivingBase player,
-            boolean isBurst,
-            boolean isAimed,
-            long clientShotTimestampNanos
-    ) {
+    public void serverFire(EntityLivingBase player, boolean isBurst, boolean isAimed, long clientShotTimestampNanos) {
         serverFire(
                 player,
                 player.getHeldItemMainhand(),
@@ -642,14 +633,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
-    public void serverFire(
-            EntityLivingBase player,
-            boolean isBurst,
-            boolean isAimed,
-            long clientShotTimestampNanos,
-            float shotYaw,
-            float shotPitch
-    ) {
+    public void serverFire(EntityLivingBase player, boolean isBurst, boolean isAimed, long clientShotTimestampNanos, float shotYaw, float shotPitch) {
         serverFire(
                 player,
                 player.getHeldItemMainhand(),
@@ -675,15 +659,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
      * @param shotPitch validated shot pitch
      * @param serverShotTimestampNanos translated server timestamp
      */
-    public void serverFire(
-            EntityLivingBase player,
-            boolean isBurst,
-            boolean isAimed,
-            long clientShotTimestampNanos,
-            float shotYaw,
-            float shotPitch,
-            long serverShotTimestampNanos
-    ) {
+    public void serverFire(EntityLivingBase player, boolean isBurst, boolean isAimed, long clientShotTimestampNanos, float shotYaw, float shotPitch, long serverShotTimestampNanos) {
         serverFire(
                 player,
                 player.getHeldItemMainhand(),
@@ -698,14 +674,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
-    public void serverFire(
-            EntityLivingBase player,
-            ItemStack itemStack,
-            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
-            boolean isBurst,
-            boolean isAimed,
-            float damageMultiplier
-    ) {
+    public void serverFire(EntityLivingBase player, ItemStack itemStack, BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith, boolean isBurst, boolean isAimed, float damageMultiplier) {
         serverFire(
                 player,
                 itemStack,
@@ -717,15 +686,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
-    public void serverFire(
-            EntityLivingBase player,
-            ItemStack itemStack,
-            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
-            boolean isBurst,
-            boolean isAimed,
-            float damageMultiplier,
-            long clientShotTimestampNanos
-    ) {
+    public void serverFire(EntityLivingBase player, ItemStack itemStack, BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith, boolean isBurst, boolean isAimed, float damageMultiplier, long clientShotTimestampNanos) {
         serverFire(
                 player,
                 itemStack,
@@ -740,17 +701,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
-    public void serverFire(
-            EntityLivingBase player,
-            ItemStack itemStack,
-            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
-            boolean isBurst,
-            boolean isAimed,
-            float damageMultiplier,
-            long clientShotTimestampNanos,
-            float shotYaw,
-            float shotPitch
-    ) {
+    public void serverFire(EntityLivingBase player, ItemStack itemStack, BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith, boolean isBurst, boolean isAimed, float damageMultiplier, long clientShotTimestampNanos, float shotYaw, float shotPitch) {
         serverFire(
                 player,
                 itemStack,
@@ -817,6 +768,26 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         if (currentServerAmmo <= 0) {
             LOGGER.error("No server ammo");
             return;
+        }
+
+        /*
+         * Apply the fire-rate limit centrally.
+         *
+         * This covers every serverFire() overload and prevents
+         * empty-ammo requests from consuming the cooldown.
+         */
+        if (player instanceof EntityPlayerMP) {
+            long rateLimitTimestamp = serverShotTimestampNanos > 0L
+                    ? Math.min(serverShotTimestampNanos, serverReceiveTimestampNanos)
+                    : serverReceiveTimestampNanos;
+
+            if (!com.cheba.combat.fire.ServerFireRateLimiter.tryAccept(
+                    (EntityPlayerMP) player,
+                    weapon,
+                    rateLimitTimestamp
+            )) {
+                return;
+            }
         }
 
         if (DEBUG_GUNSHOT_TIMING) {

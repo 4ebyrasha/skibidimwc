@@ -1,6 +1,5 @@
 package com.paneedah.mwc.network.handlers;
 
-import com.cheba.combat.fire.ServerFireRateLimiter;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.TryFireMessage;
@@ -18,6 +17,12 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 import java.util.UUID;
 
+/**
+ * Handles client weapon fire requests.
+ *
+ * <p>Client timestamps are translated into the server monotonic
+ * clock domain and clamped to the allowed rewind window.</p>
+ */
 @NoArgsConstructor
 @AllArgsConstructor
 public final class TryFireMessageHandler
@@ -91,6 +96,10 @@ public final class TryFireMessageHandler
                     )
             );
 
+            /*
+             * No artificial angular restriction is applied here.
+             * Legitimate fast flicks must not be clamped.
+             */
             float shotYaw = player.rotationYaw;
             float shotPitch = player.rotationPitch;
 
@@ -121,16 +130,6 @@ public final class TryFireMessageHandler
                             + (serverPacketReceiveNanos - serverShotTimestampNanos)
                             / 1_000_000.0D
             );
-
-            Weapon weapon = (Weapon) heldStack.getItem();
-
-            if (!ServerFireRateLimiter.tryAccept(
-                    player,
-                    weapon,
-                    serverShotTimestampNanos
-            )) {
-                return;
-            }
 
             fireManager.serverFire(
                     player,
