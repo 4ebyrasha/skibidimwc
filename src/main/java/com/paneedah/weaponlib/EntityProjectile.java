@@ -548,14 +548,15 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         return nearestHit;
     }
 
+
     /**
      * Finds an intersection between a projectile segment and a player
      * moving between two historical snapshots.
      *
      * <p>The player's movement is converted into relative projectile
-     * movement. This allows the collision test to account for target
-     * translation during the projectile segment instead of checking
-     * against a single static historical bounding box.</p>
+     * movement. If one of the segment boundary snapshots is unavailable,
+     * the midpoint snapshot is used as a static fallback. No extrapolation
+     * beyond the retained history is performed.</p>
      *
      * @param player target player
      * @param start projectile segment start
@@ -582,6 +583,19 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             return null;
         }
 
+        long midpointNanos = segmentStartNanos
+                + (segmentEndNanos - segmentStartNanos) / 2L;
+
+        HistoricalPlayerState midpointState =
+                CombatHistoryManager.getHistoricalState(
+                        player.getUniqueID(),
+                        midpointNanos
+                );
+
+        if (!isValidHistoricalState(player, midpointState)) {
+            return null;
+        }
+
         HistoricalPlayerState startState =
                 CombatHistoryManager.getHistoricalState(
                         player.getUniqueID(),
@@ -594,9 +608,27 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                         segmentEndNanos
                 );
 
+        /*
+         * At the edge of retained history one boundary may be unavailable
+         * even though the midpoint is valid.
+         *
+         * Use the midpoint hitbox for this segment rather than silently
+         * skipping the player or extrapolating an unknown position.
+         */
         if (!isValidHistoricalState(player, startState)
                 || !isValidHistoricalState(player, endState)) {
-            return null;
+
+            AxisAlignedBB fallbackBox =
+                    midpointState.getBoundingBox().grow(0.15D);
+
+            RayTraceResult fallbackHit =
+                    fallbackBox.calculateIntercept(start, end);
+
+            if (fallbackHit == null || fallbackHit.hitVec == null) {
+                return null;
+            }
+
+            return new RayTraceResult(player, fallbackHit.hitVec);
         }
 
         /*
