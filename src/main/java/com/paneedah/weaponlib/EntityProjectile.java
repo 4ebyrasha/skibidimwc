@@ -191,7 +191,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     }
 
     /**
-     * Similar to setArrowHeading, it's point the throwable entity to a x, y, z
+     * Similar to setArrowHeading, it's point the throwable entity to an x, y, z
      * direction.
      */
     public void setThrowableHeading(double x, double y, double z, float velocity, float inaccuracy) {
@@ -549,21 +549,21 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     }
 
     /**
-     * Finds the intersection between a projectile segment and a player's
-     * historical bounding box.
+     * Finds an intersection between a projectile segment and a player
+     * moving between two historical snapshots.
      *
-     * <p>The collision time depends on the intersection position along the
-     * segment. The method therefore performs several refinement iterations:
-     * it samples the historical state, obtains an intersection, and then
-     * resolves the state at the estimated impact time.</p>
+     * <p>The player's movement is converted into relative projectile
+     * movement. This allows the collision test to account for target
+     * translation during the projectile segment instead of checking
+     * against a single static historical bounding box.</p>
      *
-     * @param player current live player entity
+     * @param player target player
      * @param start projectile segment start
      * @param end projectile segment end
-     * @param segmentStartNanos estimated segment start time
-     * @param segmentEndNanos estimated segment end time
-     * @param segmentLengthSquared squared segment length
-     * @return historical entity hit, or null if there is no intersection
+     * @param segmentStartNanos segment start timestamp
+     * @param segmentEndNanos segment end timestamp
+     * @param segmentLengthSquared squared projectile segment length
+     * @return historical entity hit, or null when there is no valid hit
      */
     private RayTraceResult findHistoricalPlayerIntersection(
             EntityPlayerMP player,
@@ -573,49 +573,115 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             long segmentEndNanos,
             double segmentLengthSquared
     ) {
-        double progress = 0.5D;
-        RayTraceResult intersection = null;
-
-        for (int iteration = 0; iteration < 3; iteration++) {
-            long queryTimestamp = segmentStartNanos
-                    + Math.round(
-                    (segmentEndNanos - segmentStartNanos) * progress
-            );
-
-            HistoricalPlayerState historicalState =
-                    CombatHistoryManager.getHistoricalState(
-                            player.getUniqueID(),
-                            queryTimestamp
-                    );
-
-            if (historicalState == null
-                    || historicalState.getEntityId() != player.getEntityId()
-                    || historicalState.getDimension() != player.dimension) {
-                return null;
-            }
-
-            AxisAlignedBB historicalBox =
-                    historicalState.getBoundingBox().expand(
-                            0.15D,
-                            0.15D,
-                            0.15D
-                    );
-
-            intersection = historicalBox.calculateIntercept(start, end);
-
-            if (intersection == null || intersection.hitVec == null) {
-                return null;
-            }
-
-            Vec3d offset = intersection.hitVec.subtract(start);
-
-            progress = offset.dotProduct(end.subtract(start))
-                    / segmentLengthSquared;
-
-            progress = Math.max(0.0D, Math.min(1.0D, progress));
+        if (player == null
+                || start == null
+                || end == null
+                || segmentStartNanos <= 0L
+                || segmentEndNanos <= segmentStartNanos
+                || segmentLengthSquared <= 1.0E-12D) {
+            return null;
         }
 
-        return new RayTraceResult(player, intersection.hitVec);
+        HistoricalPlayerState startState =
+                CombatHistoryManager.getHistoricalState(
+                        player.getUniqueID(),
+                        segmentStartNanos
+                );
+
+        HistoricalPlayerState endState =
+                CombatHistoryManager.getHistoricalState(
+                        player.getUniqueID(),
+                        segmentEndNanos
+                );
+
+        if (!isValidHistoricalState(player, startState)
+                || !isValidHistoricalState(player, endState)) {
+            return null;
+        }
+
+        /*
+         * Calculate target displacement during this projectile segment.
+         */
+        Vec3d targetMotion = new Vec3d(
+                endState.getX() - startState.getX(),
+                endState.getY() - startState.getY(),
+                endState.getZ() - startState.getZ()
+        );
+
+        AxisAlignedBB startBox = startState.getBoundingBox();
+        AxisAlignedBB endBox = endState.getBoundingBox();
+
+        /*
+         * Transform the ending box into the starting target coordinate frame.
+         * The union also accounts for changes in player bounding-box dimensions.
+         */
+        AxisAlignedBB relativeEndBox = endBox.offset(
+                -targetMotion.x,
+                -targetMotion.y,
+                -targetMotion.z
+        );
+
+        AxisAlignedBB sweptBox = new AxisAlignedBB(
+                Math.min(startBox.minX, relativeEndBox.minX),
+                Math.min(startBox.minY, relativeEndBox.minY),
+                Math.min(startBox.minZ, relativeEndBox.minZ),
+                Math.max(startBox.maxX, relativeEndBox.maxX),
+                Math.max(startBox.maxY, relativeEndBox.maxY),
+                Math.max(startBox.maxZ, relativeEndBox.maxZ)
+        ).grow(0.15D);
+
+        /*
+         * In relative coordinates the target is stationary,
+         * while the projectile receives the opposite target displacement.
+         */
+        Vec3d relativeEnd = end.subtract(targetMotion);
+
+        RayTraceResult relativeHit =
+                sweptBox.calculateIntercept(start, relativeEnd);
+
+        if (relativeHit == null || relativeHit.hitVec == null) {
+            return null;
+        }
+
+        Vec3d relativeSegment = relativeEnd.subtract(start);
+        double relativeLengthSquared = relativeSegment.lengthSquared();
+
+        if (relativeLengthSquared <= 1.0E-12D) {
+            return null;
+        }
+
+        /*
+         * Resolve the collision progress along the relative segment.
+         */
+        double progress = relativeHit.hitVec
+                .subtract(start)
+                .dotProduct(relativeSegment)
+                / relativeLengthSquared;
+
+        if (progress < 0.0D || progress > 1.0D) {
+            return null;
+        }
+
+        /*
+         * Convert the relative intersection back into world coordinates.
+         */
+        Vec3d worldHit = start.add(
+                end.subtract(start).scale(progress)
+        );
+
+        return new RayTraceResult(player, worldHit);
+    }
+
+    /**
+     * Validates that a historical snapshot still belongs to the live player.
+     */
+    private boolean isValidHistoricalState(
+            EntityPlayerMP player,
+            HistoricalPlayerState state
+    ) {
+        return state != null
+                && state.getEntityId() == player.getEntityId()
+                && state.getDimension() == player.dimension;
     }
 
 
