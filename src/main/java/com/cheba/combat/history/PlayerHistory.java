@@ -8,15 +8,16 @@ import java.util.Deque;
 /**
  * Bounded chronological history of one player's authoritative snapshots.
  *
- * <p>Instances are owned by {@link CombatHistoryManager} and are expected
- * to be accessed exclusively from the logical server thread.</p>
+ * <p>Instances are owned by {@link CombatHistoryManager} and must be
+ * accessed exclusively from the logical server thread.</p>
  *
  * <p>Snapshots must have strictly increasing server-monotonic timestamps.
- * The history rejects out-of-order or duplicate timestamps and removes
+ * The history rejects duplicate or out-of-order timestamps and removes
  * entries exceeding its configured age or capacity limits.</p>
  *
- * <p>Historical queries never extrapolate. A query can only be resolved
- * when its timestamp is covered by the retained history.</p>
+ * <p>Historical queries never extrapolate. Interpolation is only permitted
+ * between consecutive snapshots when their time gap does not exceed
+ * {@link #MAX_INTERPOLATION_GAP_NANOS}.</p>
  */
 public final class PlayerHistory {
 
@@ -25,6 +26,15 @@ public final class PlayerHistory {
 
     /** Maximum age of retained snapshots: two seconds. */
     private static final long MAX_AGE_NANOS = 2_000_000_000L;
+
+    /**
+     * Maximum permitted time gap between snapshots used for interpolation.
+     *
+     * <p>A larger gap indicates that the server did not capture a sufficiently
+     * continuous movement history. Interpolating across such a gap could
+     * produce a position that the player never occupied.</p>
+     */
+    private static final long MAX_INTERPOLATION_GAP_NANOS = 250_000_000L;
 
     private final Deque<PlayerSnapshot> snapshots = new ArrayDeque<>();
 
@@ -77,21 +87,23 @@ public final class PlayerHistory {
     /**
      * Resolves the player's state at a server-monotonic timestamp.
      *
-     * <p>If the requested timestamp exactly matches a retained snapshot,
-     * that snapshot is returned as a historical state without interpolation.</p>
+     * <p>An exact snapshot match is returned without interpolation.
+     * Otherwise, the method searches for two consecutive snapshots
+     * surrounding the requested timestamp.</p>
      *
-     * <p>Otherwise, the method searches for two consecutive snapshots
-     * surrounding the requested timestamp and interpolates between them.
-     * It never extrapolates beyond the oldest or newest retained snapshot.</p>
+     * <p>Interpolation is rejected when:</p>
+     * <ul>
+     *     <li>The snapshots represent different players or entities.</li>
+     *     <li>The snapshots belong to different dimensions.</li>
+     *     <li>The timestamps are invalid or not strictly increasing.</li>
+     *     <li>The time gap between snapshots exceeds the permitted limit.</li>
+     * </ul>
      *
-     * <p>Interpolation is rejected if the snapshots do not represent the
-     * same player entity in the same dimension, or if their timestamps
-     * are not strictly increasing.</p>
+     * <p>The method never extrapolates beyond the retained history.</p>
      *
      * @param timestampNanos requested timestamp in the server's
      *                       {@link System#nanoTime()} time domain
-     * @return resolved historical state, or {@code null} if the timestamp
-     *         is outside the retained history or cannot be interpolated
+     * @return resolved historical state, or {@code null} if unavailable
      */
     public HistoricalPlayerState getStateAt(long timestampNanos) {
         if (snapshots.isEmpty()) {
@@ -151,11 +163,14 @@ public final class PlayerHistory {
     /**
      * Interpolates a state between two consecutive snapshots.
      *
+     * <p>Interpolation is only allowed when the snapshots are temporally
+     * close enough to represent a continuous movement interval. A large
+     * gap may indicate a server stall or missing movement updates.</p>
+     *
      * @param from earlier snapshot
      * @param to later snapshot
      * @param timestampNanos requested timestamp
-     * @return interpolated state, or {@code null} if the snapshots are
-     *         incompatible
+     * @return interpolated state, or {@code null} if interpolation is unsafe
      */
     private HistoricalPlayerState interpolate(
             PlayerSnapshot from,
@@ -177,8 +192,14 @@ public final class PlayerHistory {
             return null;
         }
 
+        long timeGap = toTimestamp - fromTimestamp;
+
+        if (timeGap > MAX_INTERPOLATION_GAP_NANOS) {
+            return null;
+        }
+
         double progress = (double) (timestampNanos - fromTimestamp)
-                / (double) (toTimestamp - fromTimestamp);
+                / (double) timeGap;
 
         double x = lerp(from.getX(), to.getX(), progress);
         double y = lerp(from.getY(), to.getY(), progress);
@@ -228,9 +249,6 @@ public final class PlayerHistory {
     /**
      * Interpolates an angle using the shortest path around the 360-degree
      * circle.
-     *
-     * <p>This avoids interpolating from 179 degrees to -179 degrees through
-     * zero, which would produce an incorrect 358-degree rotation.</p>
      *
      * @param from starting angle in degrees
      * @param to ending angle in degrees
