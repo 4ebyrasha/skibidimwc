@@ -88,6 +88,27 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 //        }
     }
 
+    /**
+     * Initializes the projectile using the current shooter's rotation.
+     *
+     * <p>Compatibility method for existing weapon and shell casing code.
+     * New server-authoritative firing code should use
+     * setPositionAndDirectionFromShot with an explicit shot direction.</p>
+     *
+     * @param isAiming whether the weapon is aimed
+     */
+    public void setPositionAndDirection(boolean isAiming) {
+        if (thrower == null) {
+            return;
+        }
+
+        setPositionAndDirectionFromShot(
+                isAiming,
+                thrower.rotationYaw,
+                thrower.rotationPitch
+        );
+    }
+
     public void setPositionAndDirectionFromShot(
             boolean isAiming,
             float shotYaw,
