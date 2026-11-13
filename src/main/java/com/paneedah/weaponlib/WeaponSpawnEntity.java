@@ -73,6 +73,13 @@ public class WeaponSpawnEntity extends EntityProjectile {
     private static final double WHIZZ_MAX_DIST = 1.7;        // свист
     private static final double MIN_CRACK_DISTANCE = 15.0;   // минимальная дистанция для сверхзвука
     private static final double SUPPRESSION_MIN_DISTANCE = 20.0;
+
+    /**
+     * Estimated server-monotonic timestamp when this projectile was fired.
+     * A value of -1 means that no synchronized shot timestamp was supplied.
+     */
+    private long serverShotTimestampNanos = -1L;
+
     @SuppressWarnings("all")
     private Vec3d startPos;
 
@@ -254,6 +261,25 @@ public class WeaponSpawnEntity extends EntityProjectile {
         }
 
         prevPosOnServer = curPos;
+    }
+
+    /**
+     * Returns the estimated server-monotonic time of the original shot.
+     *
+     * @return shot timestamp in nanoseconds, or -1 when unavailable
+     */
+    public long getServerShotTimestampNanos() {
+        return serverShotTimestampNanos;
+    }
+
+    /**
+     * Sets the estimated server-monotonic time of the original shot.
+     *
+     * @param timestampNanos server-monotonic timestamp
+     */
+    public void setServerShotTimestampNanos(long timestampNanos) {
+        this.serverShotTimestampNanos =
+                timestampNanos > 0L ? timestampNanos : -1L;
     }
 
     @Override

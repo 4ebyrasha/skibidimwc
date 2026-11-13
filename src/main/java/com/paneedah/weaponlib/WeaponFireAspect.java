@@ -641,9 +641,46 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 1.0f,
                 clientShotTimestampNanos,
                 shotYaw,
-                shotPitch
+                shotPitch,
+                -1L
         );
     }
+
+    /**
+     * Fires a weapon while preserving both client and server shot timestamps.
+     *
+     * @param player shooter
+     * @param isBurst whether this shot belongs to a burst
+     * @param isAimed whether the weapon is aimed
+     * @param clientShotTimestampNanos original client timestamp, retained for audio
+     * @param shotYaw validated shot yaw
+     * @param shotPitch validated shot pitch
+     * @param serverShotTimestampNanos translated and server-clamped shot timestamp
+     */
+    public void serverFire(
+            EntityLivingBase player,
+            boolean isBurst,
+            boolean isAimed,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch,
+            long serverShotTimestampNanos
+    ) {
+        serverFire(
+                player,
+                player.getHeldItemMainhand(),
+                null,
+                isBurst,
+                isAimed,
+                1.0f,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch,
+                serverShotTimestampNanos
+        );
+    }
+
+
 
     public void serverFire(
             EntityLivingBase player,
@@ -697,6 +734,39 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             float shotYaw,
             float shotPitch
     ) {
+        serverFire(
+                player,
+                itemStack,
+                spawnEntityWith,
+                isBurst,
+                isAimed,
+                damageMultiplier,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch,
+                -1L
+        );
+    }
+
+    /**
+     * Server-side weapon firing with a separate server-domain shot timestamp.
+     *
+     * The client timestamp remains unchanged for remote gunshot audio timing.
+     * The server timestamp is attached to each physical projectile for later
+     * historical hit registration.
+     */
+    public void serverFire(
+            EntityLivingBase player,
+            ItemStack itemStack,
+            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
+            boolean isBurst,
+            boolean isAimed,
+            float damageMultiplier,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch,
+            long serverShotTimestampNanos
+    ) {
 
         if (itemStack == null
                 || itemStack.isEmpty()
@@ -742,10 +812,15 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                             : serverReceiveTimestampNanos - previousServerTimestamp;
 
             LOGGER.info(
-                    "[GunshotTiming][SERVER] shooter={} clientShotDtMs={} serverReceiveDtMs={}",
+                    "[GunshotTiming][SERVER] shooter={} clientShotDtMs={} serverReceiveDtMs={} serverShotAgeMs={}",
                     shooterId,
                     formatTimingInterval(clientInterval),
-                    formatTimingInterval(serverReceiveInterval)
+                    formatTimingInterval(serverReceiveInterval),
+                    serverShotTimestampNanos > 0L
+                            ? formatTimingInterval(
+                            serverReceiveTimestampNanos - serverShotTimestampNanos
+                    )
+                            : "unavailable"
             );
         }
 
@@ -824,6 +899,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     0,
                     0
             );
+
+            bullet.setServerShotTimestampNanos(serverShotTimestampNanos);
 
             bullet.setPositionAndDirectionFromShot(
                     isAimed,
