@@ -5,8 +5,7 @@ import org.apache.logging.log4j.Logger;
 
 public final class CombatLog {
 
-    private static final Logger LOGGER =
-            LogManager.getLogger("MWC-Combat");
+    private static final Logger LOGGER = LogManager.getLogger("MWC-Combat");
 
     private static volatile boolean debugEnabled;
     private static volatile boolean traceEnabled;
