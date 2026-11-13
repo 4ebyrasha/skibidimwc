@@ -185,7 +185,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
 
             // свист
             if (dist <= WHIZZ_MAX_DIST && WHIZZ_SOUND != null) {
-                float whizzPitch = 0.98F + world.rand.nextFloat() * 0.03F;
+                float whizzPitch = 0.93F + world.rand.nextFloat() * 0.13F;
                 float whizzMissDist = isSubsonic ? (float) dist : -1f;
 
                 CHANNEL.sendTo(
@@ -194,7 +194,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
                                 bulletPass.y,
                                 bulletPass.z,
                                 (byte) 0,
-                                0.8F,
+                                0.5F,
                                 whizzPitch,
                                 whizzMissDist,
                                 isSubsonic
@@ -240,7 +240,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
                                     crackPos.y,
                                     crackPos.z,
                                     (byte) 1,
-                                    0.25F,
+                                    0.18F,
                                     crackPitch,
                                     missDistForEffect,
                                     false
