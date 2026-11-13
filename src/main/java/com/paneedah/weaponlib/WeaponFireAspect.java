@@ -944,23 +944,30 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         }
 
         /*
-         * One projectile is created for each configured pellet.
-         * Catch-up is performed before the projectile is added to the world.
+         * Calculate catch-up once so every pellet from this shot
+         * uses the same simulation age.
          */
+        long projectileAgeNanos = historicalOriginAvailable
+                ? Math.max(0L, System.nanoTime() - serverShotTimestampNanos)
+                : 0L;
+
+        int catchUpTicks = historicalOriginAvailable
+                ? (int) Math.min(
+                MAX_PROJECTILE_CATCH_UP_TICKS,
+                projectileAgeNanos / COMBAT_TICK_NANOS
+        )
+                : 0;
+
         for (int i = 0; i < weapon.builder.pellets; i++) {
 
             double damage = BalancePackManager.getNetGunDamage(weapon);
-
-            double hipFireSpread = 2.6;
+            double hipFireSpread = 2.6D;
 
             if (BalancePackManager.hasActiveBalancePack()) {
-                hipFireSpread =
-                        BalancePackManager.getGlobalHipFireSpread();
-
-                hipFireSpread *=
-                        BalancePackManager.getGroupHipFireSpread(
-                                weapon.getConfigurationGroup()
-                        );
+                hipFireSpread = BalancePackManager.getGlobalHipFireSpread();
+                hipFireSpread *= BalancePackManager.getGroupHipFireSpread(
+                        weapon.getConfigurationGroup()
+                );
             }
 
             damage *= damageMultiplier;
@@ -972,7 +979,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     weapon.getSpawnEntityVelocity(),
                     weapon.getSpawnEntityGravityVelocity(),
                     BalancePackManager.getInaccuracy(weapon)
-                            + (isAimed ? 0.0f : (float) hipFireSpread),
+                            + (isAimed ? 0.0F : (float) hipFireSpread),
                     (float) damage,
                     weapon.getSpawnEntityExplosionRadius(),
                     weapon.isDestroyingBlocks(),
@@ -998,41 +1005,39 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     projectileOrigin
             );
 
-            if (historicalOriginAvailable) {
-                long elapsedNanos =
-                        Math.max(
-                                0L,
-                                System.nanoTime() - serverShotTimestampNanos
-                        );
-
-                int catchUpTicks = (int) Math.min(
-                        MAX_PROJECTILE_CATCH_UP_TICKS,
-                        elapsedNanos / COMBAT_TICK_NANOS
-                );
-
-                for (int tick = 0;
-                     tick < catchUpTicks && !bullet.isDead;
-                     tick++) {
-                    bullet.onUpdate();
-                }
-
-                LOGGER.debug(
+            /*
+             * Register the projectile before simulating elapsed ticks.
+             * Collision and damage must only happen for a world entity.
+             */
+            if (!player.world.spawnEntity(bullet)) {
+                LOGGER.warn(
                         "[MWC Combat][WeaponFireAspect#serverFire] "
-                                + "Projectile catch-up completed | "
-                                + "Player={} | Pellet={}/{} | "
-                                + "CatchUpTicks={} | ShotAgeMs={} | Dead={}",
+                                + "Projectile spawn rejected | Player={} | Pellet={}/{}",
                         player.getUniqueID(),
                         i + 1,
-                        weapon.builder.pellets,
-                        catchUpTicks,
-                        elapsedNanos / 1_000_000.0D,
-                        bullet.isDead
+                        weapon.builder.pellets
                 );
+                continue;
             }
 
-            if (!bullet.isDead) {
-                player.world.spawnEntity(bullet);
+            for (int tick = 0;
+                 tick < catchUpTicks && !bullet.isDead;
+                 tick++) {
+                bullet.onUpdate();
             }
+
+            LOGGER.debug(
+                    "[MWC Combat][WeaponFireAspect#serverFire] "
+                            + "Projectile catch-up completed | "
+                            + "Player={} | Pellet={}/{} | "
+                            + "CatchUpTicks={} | ShotAgeMs={} | Dead={}",
+                    player.getUniqueID(),
+                    i + 1,
+                    weapon.builder.pellets,
+                    catchUpTicks,
+                    projectileAgeNanos / 1_000_000.0D,
+                    bullet.isDead
+            );
         }
 
         /*
