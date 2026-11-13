@@ -22,6 +22,10 @@ import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 
 import java.util.List;
 
+import com.cheba.combat.history.CombatHistoryManager;
+import com.cheba.combat.history.HistoricalPlayerState;
+import net.minecraft.entity.player.EntityPlayerMP;
+
 import static com.paneedah.mwc.MWC.CHANNEL;
 
 public abstract class EntityProjectile extends Entity implements IProjectile, IEntityAdditionalSpawnData {
@@ -282,10 +286,10 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         if (!world.isRemote) {
-            Entity entity = getRayTraceEntities(vec3, vec31);
+            RayTraceResult entityHit = getRayTraceEntities(vec3, vec31);
 
-            if (entity != null) {
-                movingobjectposition = new RayTraceResult(entity);
+            if (entityHit != null) {
+                movingobjectposition = entityHit;
             }
         }
 
@@ -339,61 +343,239 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         this.setPosition(this.posX, this.posY, this.posZ);
     }
 
-    private Entity getRayTraceEntities(Vector3D vec3, Vector3D vec31) {
-        Entity entity = null;
-        List<?> list = world.getEntitiesWithinAABBExcludingEntity(entity,
-                this.getEntityBoundingBox()
-                        .expand(this.motionX, this.motionY, this.motionZ)
-                        .expand(1.0D, 1.0D, 1.0D));
-        double d0 = 0.0D;
-        EntityLivingBase entitylivingbase = this.getThrower();
+    /**
+     * Performs swept entity collision for the current projectile segment.
+     *
+     * <p>Ordinary entities are checked against their current bounding boxes.
+     * Server-side players are checked against historical bounding boxes when
+     * a valid synchronized shot timestamp and historical state are available.</p>
+     *
+     * <p>The projectile itself is never rewound. Only the target bounding box
+     * used for collision detection is historical. The returned entity remains
+     * the current live entity, allowing the normal damage pipeline to run.</p>
+     *
+     * @param vec3 segment start
+     * @param vec31 segment end, already clipped against block collision
+     * @return nearest entity hit, including its exact intersection point
+     */
+    private RayTraceResult getRayTraceEntities(
+            Vector3D vec3,
+            Vector3D vec31
+    ) {
+        Vec3d start = VectorUtil.convertToVec3d(vec3);
+        Vec3d end = VectorUtil.convertToVec3d(vec31);
 
-        for (Object o : list) {
-            Entity entity1 = (Entity) o;
+        Vec3d segment = end.subtract(start);
+        double segmentLengthSquared = segment.lengthSquared();
 
-            // ФИЛЬТР ВОСПРИЯТИЯ (custom npcs)
-            // Если сущность реализует IPerceptionFilter и не воспринимается стрелком то
-            // пуля пролетает сквозь нее
-            // ни урона, ни крови, ни агро, ни звука
-            if (entity1 instanceof com.cheba.api.IPerceptionFilter) {
-                if (!((com.cheba.api.IPerceptionFilter) entity1).isPerceivableBy(entitylivingbase)) {
+        if (segmentLengthSquared <= 1.0E-12D) {
+            return null;
+        }
+
+        EntityLivingBase shooter = getThrower();
+
+        List<Entity> entities = world.getEntitiesWithinAABBExcludingEntity(
+                this,
+                getEntityBoundingBox()
+                        .expand(motionX, motionY, motionZ)
+                        .expand(1.0D, 1.0D, 1.0D)
+        );
+
+        RayTraceResult nearestHit = null;
+        double nearestDistanceSquared = Double.MAX_VALUE;
+
+        long shotTimestampNanos = -1L;
+
+        if (this instanceof WeaponSpawnEntity && !world.isRemote) {
+            shotTimestampNanos =
+                    ((WeaponSpawnEntity) this).getServerShotTimestampNanos();
+        }
+
+        for (Entity target : entities) {
+            if (target == null || target == shooter) {
+                continue;
+            }
+
+            if (target instanceof com.cheba.api.IPerceptionFilter) {
+                com.cheba.api.IPerceptionFilter filter =
+                        (com.cheba.api.IPerceptionFilter) target;
+
+                if (!filter.isPerceivableBy(shooter)) {
                     continue;
                 }
             }
-            // конец метода
 
-            boolean flag = true;
-            if (entity1 instanceof EntityLivingBase) {
-                EntityLivingBase elb = (EntityLivingBase) entity1;
-                flag = elb.deathTime == 0;
+            if (!target.canBeCollidedWith()) {
+                continue;
             }
 
-            if (flag && entity1.canBeCollidedWith() && (entity1 != entitylivingbase || this.ticksInAir >= 5)) {
-                float f1 = 0.15F, f2 = -0.15f;
-                AxisAlignedBB axisalignedbb = entity1.getEntityBoundingBox().expand(f1, f1, f1);
-                Vec3d vec3d = VectorUtil.convertToVec3d(vec3);
-                Vec3d vec3d1 = VectorUtil.convertToVec3d(vec31);
-                RayTraceResult movingobjectposition = axisalignedbb.calculateIntercept(vec3d, vec3d1);
-                AxisAlignedBB axisalignedbb1 = entity1.getEntityBoundingBox().expand(f2, f2, f2);
-                RayTraceResult movingobjectposition1 = axisalignedbb1.calculateIntercept(vec3d, vec3d1);
+            if (target instanceof EntityLivingBase
+                    && ((EntityLivingBase) target).deathTime != 0) {
+                continue;
+            }
 
-                if (movingobjectposition != null) {
-                    double d1 = vec3d.distanceTo(movingobjectposition.hitVec);
-                    if (d1 < d0 || d0 == 0.0D) {
-                        entity = entity1;
-                        d0 = d1;
+            if (target == shooter && ticksInAir < 5) {
+                continue;
+            }
+
+            AxisAlignedBB collisionBox = null;
+
+            /*
+             * Historical collision is only available for server-side players.
+             * If history is available at the segment midpoint, the current
+             * player bounding box must not be used as a fallback merely because
+             * the historical box was not intersected.
+             */
+            if (target instanceof EntityPlayerMP
+                    && shotTimestampNanos > 0L) {
+
+                EntityPlayerMP player = (EntityPlayerMP) target;
+
+                long segmentStartNanos =
+                        shotTimestampNanos
+                                + Math.max(0L, ticksExisted - 1L) * 50_000_000L;
+
+                long segmentEndNanos =
+                        segmentStartNanos + 50_000_000L;
+
+                long midpointNanos =
+                        segmentStartNanos
+                                + (segmentEndNanos - segmentStartNanos) / 2L;
+
+                HistoricalPlayerState midpointState =
+                        CombatHistoryManager.getHistoricalState(
+                                player.getUniqueID(),
+                                midpointNanos
+                        );
+
+                if (midpointState != null
+                        && midpointState.getEntityId() == player.getEntityId()
+                        && midpointState.getDimension() == player.dimension) {
+
+                    RayTraceResult historicalHit =
+                            findHistoricalPlayerIntersection(
+                                    player,
+                                    start,
+                                    end,
+                                    segmentStartNanos,
+                                    segmentEndNanos,
+                                    segmentLengthSquared
+                            );
+
+                    if (historicalHit != null) {
+                        double distanceSquared =
+                                start.squareDistanceTo(historicalHit.hitVec);
+
+                        if (distanceSquared < nearestDistanceSquared) {
+                            nearestDistanceSquared = distanceSquared;
+                            nearestHit = historicalHit;
+                        }
                     }
-                } else if (movingobjectposition1 != null) {
-                    double d1 = vec3d.distanceTo(movingobjectposition1.hitVec);
-                    if (d1 < d0 || d0 == 0.0D) {
-                        entity = entity1;
-                        d0 = d1;
-                    }
+
+                    // A valid historical state exists: do not test the
+                    // player's current position for this projectile segment.
+                    continue;
                 }
             }
+
+            /*
+             * Fallback for non-player entities and players without usable
+             * historical data.
+             */
+            collisionBox = target.getEntityBoundingBox().expand(
+                    0.15D,
+                    0.15D,
+                    0.15D
+            );
+
+            RayTraceResult hit = collisionBox.calculateIntercept(start, end);
+
+            if (hit == null || hit.hitVec == null) {
+                continue;
+            }
+
+            double distanceSquared = start.squareDistanceTo(hit.hitVec);
+
+            if (distanceSquared < nearestDistanceSquared) {
+                nearestDistanceSquared = distanceSquared;
+                nearestHit = new RayTraceResult(target, hit.hitVec);
+            }
         }
-        return entity;
+
+        return nearestHit;
     }
+
+    /**
+     * Finds the intersection between a projectile segment and a player's
+     * historical bounding box.
+     *
+     * <p>The collision time depends on the intersection position along the
+     * segment. The method therefore performs a few refinement iterations:
+     * it first samples the historical state at the segment midpoint, obtains
+     * an intersection, and then resolves the state at the estimated impact
+     * time.</p>
+     *
+     * @param player current live player entity
+     * @param start projectile segment start
+     * @param end projectile segment end
+     * @param segmentStartNanos estimated segment start time
+     * @param segmentEndNanos estimated segment end time
+     * @param segmentLengthSquared squared segment length
+     * @return historical entity hit, or null if there is no intersection
+     */
+    private RayTraceResult findHistoricalPlayerIntersection(
+            EntityPlayerMP player,
+            Vec3d start,
+            Vec3d end,
+            long segmentStartNanos,
+            long segmentEndNanos,
+            double segmentLengthSquared
+    ) {
+        double progress = 0.5D;
+        RayTraceResult intersection = null;
+
+        for (int iteration = 0; iteration < 3; iteration++) {
+            long queryTimestamp = segmentStartNanos
+                    + Math.round(
+                    (segmentEndNanos - segmentStartNanos) * progress
+            );
+
+            HistoricalPlayerState historicalState =
+                    CombatHistoryManager.getHistoricalState(
+                            player.getUniqueID(),
+                            queryTimestamp
+                    );
+
+            if (historicalState == null
+                    || historicalState.getEntityId() != player.getEntityId()
+                    || historicalState.getDimension() != player.dimension) {
+                return null;
+            }
+
+            AxisAlignedBB historicalBox =
+                    historicalState.getBoundingBox().expand(
+                            0.15D,
+                            0.15D,
+                            0.15D
+                    );
+
+            intersection = historicalBox.calculateIntercept(start, end);
+
+            if (intersection == null || intersection.hitVec == null) {
+                return null;
+            }
+
+            Vec3d offset = intersection.hitVec.subtract(start);
+
+            progress = offset.dotProduct(end.subtract(start))
+                    / segmentLengthSquared;
+
+            progress = Math.max(0.0D, Math.min(1.0D, progress));
+        }
+
+        return new RayTraceResult(player, intersection.hitVec);
+    }
+
 
     /**
      * Called when this EntityThrowable hits a block or entity.
