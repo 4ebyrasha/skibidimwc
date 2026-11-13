@@ -5,11 +5,16 @@ import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 
 /**
  * Handles lifecycle cleanup for combat history and clock synchronization.
+ *
+ * <p>Player connection and dimension events are received through the
+ * FML event bus. Living entity death events are received through the
+ * Forge event bus.</p>
  */
 public final class CombatHistoryEventHandler {
 
@@ -22,7 +27,9 @@ public final class CombatHistoryEventHandler {
      * @param event player logout event
      */
     @SubscribeEvent
-    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+    public static void onPlayerLogout(
+            PlayerEvent.PlayerLoggedOutEvent event
+    ) {
         if (!(event.player instanceof EntityPlayerMP)) {
             return;
         }
@@ -41,6 +48,9 @@ public final class CombatHistoryEventHandler {
 
     /**
      * Removes movement history when a player dies.
+     *
+     * <p>Clock synchronization remains valid because death does not
+     * change the client's or server's monotonic clock.</p>
      *
      * @param event living entity death event
      */
