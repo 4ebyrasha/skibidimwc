@@ -8,17 +8,10 @@ import java.util.UUID;
 /**
  * Immutable snapshot of a player's authoritative server-side state.
  *
- * <p>The snapshot captures position, rotation, dimension and bounding box
- * after the server has accepted a movement update. It does not contain
- * client-provided coordinates or timestamps.</p>
+ * <p>The snapshot captures position, rotation, eye height, dimension and
+ * bounding box from the server-side player entity.</p>
  *
- * <p>The timestamp belongs to the server's {@link System#nanoTime()}
- * time domain. It must only be compared with timestamps captured by
- * the same server process.</p>
- *
- * <p>All captured numeric values are validated before the snapshot is
- * constructed. Invalid entity state is rejected instead of being stored
- * in the historical timeline.</p>
+ * <p>The timestamp belongs to the server's System.nanoTime() time domain.</p>
  */
 public final class PlayerSnapshot {
 
@@ -34,6 +27,7 @@ public final class PlayerSnapshot {
 
     private final float yaw;
     private final float pitch;
+    private final float eyeHeight;
 
     private final AxisAlignedBB boundingBox;
 
@@ -42,8 +36,7 @@ public final class PlayerSnapshot {
      *
      * @param player server-side player
      * @param timestampNanos timestamp captured by the server
-     * @throws IllegalArgumentException if the player or captured state
-     *                                  contains invalid values
+     * @throws IllegalArgumentException if the player state is invalid
      */
     public PlayerSnapshot(EntityPlayerMP player, long timestampNanos) {
         if (player == null) {
@@ -61,14 +54,16 @@ public final class PlayerSnapshot {
 
         this.yaw = player.rotationYaw;
         this.pitch = player.rotationPitch;
+        this.eyeHeight = player.getEyeHeight();
 
         AxisAlignedBB box = player.getEntityBoundingBox();
 
         if (!isFinite(x) || !isFinite(y) || !isFinite(z)
                 || !isFinite(yaw) || !isFinite(pitch)
+                || !isFinite(eyeHeight) || eyeHeight < 0.0F
                 || !isValidBoundingBox(box)) {
             throw new IllegalArgumentException(
-                    "Player snapshot contains invalid position, rotation or bounding box"
+                    "Player snapshot contains invalid position, rotation, eye height or bounding box"
             );
         }
 
@@ -82,32 +77,14 @@ public final class PlayerSnapshot {
         );
     }
 
-    /**
-     * Checks whether a double value is finite.
-     *
-     * @param value value to validate
-     * @return true if the value is neither NaN nor infinite
-     */
     private static boolean isFinite(double value) {
         return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
-    /**
-     * Checks whether a float value is finite.
-     *
-     * @param value value to validate
-     * @return true if the value is neither NaN nor infinite
-     */
     private static boolean isFinite(float value) {
         return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 
-    /**
-     * Validates the player's bounding box.
-     *
-     * @param box bounding box to validate
-     * @return true if all coordinates are finite and bounds are ordered
-     */
     private static boolean isValidBoundingBox(AxisAlignedBB box) {
         if (box == null) {
             return false;
@@ -161,10 +138,16 @@ public final class PlayerSnapshot {
     }
 
     /**
-     * Returns the captured bounding box.
+     * Returns the player's eye height at the captured moment.
      *
-     * <p>{@link AxisAlignedBB} is immutable in Minecraft 1.12.2, so the
-     * stored instance can safely be shared with historical queries.</p>
+     * @return historical eye height
+     */
+    public float getEyeHeight() {
+        return eyeHeight;
+    }
+
+    /**
+     * Returns the captured bounding box.
      *
      * @return captured bounding box
      */

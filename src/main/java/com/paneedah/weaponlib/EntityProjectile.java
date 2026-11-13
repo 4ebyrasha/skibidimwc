@@ -88,19 +88,46 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 //        }
     }
 
-    public void setPositionAndDirection(boolean isAiming) {
-        setPositionAndDirectionFromShot(
-                isAiming,
-                thrower.rotationYaw,
-                thrower.rotationPitch
-        );
-    }
-
     public void setPositionAndDirectionFromShot(
             boolean isAiming,
             float shotYaw,
             float shotPitch
     ) {
+        Vec3d currentEyePosition = new Vec3d(
+                thrower.posX,
+                thrower.posY + thrower.getEyeHeight(),
+                thrower.posZ
+        );
+
+        setPositionAndDirectionFromShot(
+                isAiming,
+                shotYaw,
+                shotPitch,
+                currentEyePosition
+        );
+    }
+
+    /**
+     * Initializes the projectile from an explicitly supplied shooter eye position.
+     *
+     * <p>The supplied position may represent a historical server-side position.
+     * The live shooter entity is never moved or modified.</p>
+     *
+     * @param isAiming whether the weapon is aimed
+     * @param shotYaw shot yaw in degrees
+     * @param shotPitch shot pitch in degrees
+     * @param eyePosition shooter eye position at the shot timestamp
+     */
+    public void setPositionAndDirectionFromShot(
+            boolean isAiming,
+            float shotYaw,
+            float shotPitch,
+            Vec3d eyePosition
+    ) {
+        if (eyePosition == null) {
+            throw new IllegalArgumentException("eyePosition cannot be null");
+        }
+
         double yawRadians = Math.toRadians(shotYaw);
         double pitchRadians = Math.toRadians(shotPitch);
 
@@ -112,16 +139,14 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 Math.cos(yawRadians) * cosPitch
         );
 
-        Vec3d eyePosition = new Vec3d(
-                thrower.posX,
-                thrower.posY + thrower.getEyeHeight(),
-                thrower.posZ
-        );
-
         Vec3d spawnPosition = eyePosition.add(
                 direction.scale(PROJECTILE_SPAWN_FORWARD_OFFSET)
         );
 
+        /*
+         * Block collision is still checked against the current world.
+         * Historical block rollback is intentionally not part of this change.
+         */
         RayTraceResult obstruction = world.rayTraceBlocks(
                 eyePosition,
                 spawnPosition,

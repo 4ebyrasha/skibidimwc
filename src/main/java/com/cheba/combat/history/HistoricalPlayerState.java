@@ -7,16 +7,10 @@ import java.util.UUID;
 /**
  * Immutable representation of a player's historical state.
  *
- * <p>Unlike {@link PlayerSnapshot}, this class does not represent a state
- * captured at a specific packet-processing instant. It may also represent
- * an interpolated state between two snapshots.</p>
+ * <p>The state may represent either an exact snapshot or an interpolated
+ * state between two consecutive snapshots.</p>
  *
- * <p>All timestamps use the server's monotonic {@link System#nanoTime()}
- * time domain. They must never be compared with timestamps obtained
- * from a different machine.</p>
- *
- * <p>The state is detached from the live player entity. Reading or using
- * this object cannot move, rotate, or otherwise modify that entity.</p>
+ * <p>All timestamps belong to the server's System.nanoTime() time domain.</p>
  */
 public final class HistoricalPlayerState {
 
@@ -32,22 +26,24 @@ public final class HistoricalPlayerState {
 
     private final float yaw;
     private final float pitch;
+    private final float eyeHeight;
 
     private final AxisAlignedBB boundingBox;
 
     /**
-     * Creates a historical player state.
+     * Creates an immutable historical player state.
      *
-     * @param playerId stable player UUID
-     * @param entityId entity ID at the time represented by this state
-     * @param dimension dimension containing the player
-     * @param timestampNanos requested server-monotonic timestamp
-     * @param x interpolated or captured X coordinate
-     * @param y interpolated or captured Y coordinate
-     * @param z interpolated or captured Z coordinate
-     * @param yaw interpolated or captured yaw
-     * @param pitch interpolated or captured pitch
-     * @param boundingBox historical entity bounding box
+     * @param playerId player UUID
+     * @param entityId historical entity ID
+     * @param dimension historical dimension
+     * @param timestampNanos requested server timestamp
+     * @param x historical X coordinate
+     * @param y historical Y coordinate
+     * @param z historical Z coordinate
+     * @param yaw historical yaw
+     * @param pitch historical pitch
+     * @param eyeHeight historical eye height
+     * @param boundingBox historical bounding box
      */
     public HistoricalPlayerState(
             UUID playerId,
@@ -59,6 +55,7 @@ public final class HistoricalPlayerState {
             double z,
             float yaw,
             float pitch,
+            float eyeHeight,
             AxisAlignedBB boundingBox
     ) {
         if (playerId == null) {
@@ -67,6 +64,12 @@ public final class HistoricalPlayerState {
 
         if (boundingBox == null) {
             throw new IllegalArgumentException("boundingBox cannot be null");
+        }
+
+        if (Float.isNaN(eyeHeight)
+                || Float.isInfinite(eyeHeight)
+                || eyeHeight < 0.0F) {
+            throw new IllegalArgumentException("Invalid eye height");
         }
 
         this.playerId = playerId;
@@ -80,6 +83,7 @@ public final class HistoricalPlayerState {
 
         this.yaw = yaw;
         this.pitch = pitch;
+        this.eyeHeight = eyeHeight;
 
         this.boundingBox = new AxisAlignedBB(
                 boundingBox.minX,
@@ -91,59 +95,51 @@ public final class HistoricalPlayerState {
         );
     }
 
-    /** @return UUID of the represented player */
     public UUID getPlayerId() {
         return playerId;
     }
 
-    /** @return entity ID represented by this state */
     public int getEntityId() {
         return entityId;
     }
 
-    /** @return dimension containing the represented state */
     public int getDimension() {
         return dimension;
     }
 
-    /** @return requested server-monotonic timestamp */
     public long getTimestampNanos() {
         return timestampNanos;
     }
 
-    /** @return historical X coordinate */
     public double getX() {
         return x;
     }
 
-    /** @return historical Y coordinate */
     public double getY() {
         return y;
     }
 
-    /** @return historical Z coordinate */
     public double getZ() {
         return z;
     }
 
-    /** @return historical yaw in degrees */
     public float getYaw() {
         return yaw;
     }
 
-    /** @return historical pitch in degrees */
     public float getPitch() {
         return pitch;
     }
 
     /**
-     * Returns the historical bounding box.
+     * Returns the eye height at the represented moment.
      *
-     * <p>{@link AxisAlignedBB} is immutable in Minecraft 1.12.2, so
-     * returning this instance cannot mutate the stored state.</p>
-     *
-     * @return historical bounding box
+     * @return historical eye height
      */
+    public float getEyeHeight() {
+        return eyeHeight;
+    }
+
     public AxisAlignedBB getBoundingBox() {
         return boundingBox;
     }

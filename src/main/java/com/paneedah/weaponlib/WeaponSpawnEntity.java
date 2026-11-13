@@ -283,32 +283,61 @@ public class WeaponSpawnEntity extends EntityProjectile {
     }
 
     @Override
-    public void setPositionAndDirection(boolean isAiming) {
-        setPositionAndDirectionFromShot(
-                isAiming,
-                thrower.rotationYaw,
-                thrower.rotationPitch
-        );
-    }
-
-    @Override
     public void setPositionAndDirectionFromShot(
             boolean isAiming,
             float shotYaw,
             float shotPitch
     ) {
+        Vec3d currentEyePosition = new Vec3d(
+                thrower.posX,
+                thrower.posY + thrower.getEyeHeight(),
+                thrower.posZ
+        );
+
+        setPositionAndDirectionFromShot(
+                isAiming,
+                shotYaw,
+                shotPitch,
+                currentEyePosition
+        );
+    }
+
+    /**
+     * Initializes the projectile and its server-side segment tracking from
+     * the supplied shooter eye position.
+     *
+     * @param isAiming whether the weapon is aimed
+     * @param shotYaw shot yaw
+     * @param shotPitch shot pitch
+     * @param eyePosition current or historical shooter eye position
+     */
+    @Override
+    public void setPositionAndDirectionFromShot(
+            boolean isAiming,
+            float shotYaw,
+            float shotPitch,
+            Vec3d eyePosition
+    ) {
         super.setPositionAndDirectionFromShot(
                 isAiming,
                 shotYaw,
-                shotPitch
+                shotPitch,
+                eyePosition
         );
 
-        this.prevPosOnServer =
-                new Vec3d(this.posX, this.posY, this.posZ);
+        this.prevPosOnServer = new Vec3d(
+                this.posX,
+                this.posY,
+                this.posZ
+        );
 
-        this.startPos =
-                new Vec3d(this.posX, this.posY, this.posZ);
+        this.startPos = new Vec3d(
+                this.posX,
+                this.posY,
+                this.posZ
+        );
     }
+
 
     private boolean isBlockedByBlocks(Vec3d from, Vec3d to) {
         RayTraceResult result = world.rayTraceBlocks(from, to, false, true, false);

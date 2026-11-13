@@ -47,6 +47,10 @@ import static com.paneedah.mwc.proxies.ClientProxy.MC;
 import com.paneedah.mwc.client.audio.GunshotPositionedSound;
 import net.minecraft.client.audio.ISound;
 
+import com.cheba.combat.history.CombatHistoryManager;
+import com.cheba.combat.history.HistoricalPlayerState;
+
+
 /*
  * On a client side this class is used from within
  * a separate client "ticker" thread.
@@ -140,6 +144,19 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
     private final ModContext modContext;
 
     private StateManager<WeaponState, ? super PlayerWeaponInstance> stateManager;
+
+    /**
+     * Nominal duration of one Minecraft server tick.
+     */
+    private static final long COMBAT_TICK_NANOS = 50_000_000L;
+
+    /**
+     * Maximum projectile catch-up.
+     * <p>
+     * The current server rewind window is 200 ms.
+     * Four nominal ticks cover that window.
+     */
+    private static final int MAX_PROJECTILE_CATCH_UP_TICKS = 4;
 
     public WeaponFireAspect(CommonModContext modContext) {
         this.modContext = modContext;
@@ -861,6 +878,55 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             spawnEntityWith = weapon.builder.spawnEntityWith;
         }
 
+        /*
+         * Resolve the shooter's eye position at the original shot timestamp.
+         *
+         * If historical data is unavailable, use the current position and disable
+         * target rewind for these projectiles.
+         */
+        Vec3d projectileOrigin = new Vec3d(
+                player.posX,
+                player.posY + player.getEyeHeight(),
+                player.posZ
+        );
+
+        boolean historicalOriginAvailable = false;
+
+        if (player instanceof EntityPlayerMP
+                && serverShotTimestampNanos > 0L) {
+
+            EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
+
+            HistoricalPlayerState shooterState =
+                    CombatHistoryManager.getHistoricalState(
+                            serverPlayer.getUniqueID(),
+                            serverShotTimestampNanos
+                    );
+
+            if (shooterState != null
+                    && shooterState.getEntityId() == serverPlayer.getEntityId()
+                    && shooterState.getDimension() == serverPlayer.dimension) {
+
+                projectileOrigin = new Vec3d(
+                        shooterState.getX(),
+                        shooterState.getY() + shooterState.getEyeHeight(),
+                        shooterState.getZ()
+                );
+
+                historicalOriginAvailable = true;
+            } else {
+                LOGGER.debug(
+                        "[MWC Combat][WeaponFireAspect#serverFire] "
+                                + "Historical shooter origin unavailable; "
+                                + "projectile rewind disabled | Player={} | "
+                                + "ShotTimestamp={} | StateAvailable={}",
+                        serverPlayer.getUniqueID(),
+                        serverShotTimestampNanos,
+                        shooterState != null
+                );
+            }
+        }
+
         for (int i = 0; i < weapon.builder.pellets; i++) {
 
             double damage = BalancePackManager.getNetGunDamage(weapon);
@@ -900,12 +966,113 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     0
             );
 
-            bullet.setServerShotTimestampNanos(serverShotTimestampNanos);
+            bullet.setServerShotTimestampNanos(
+                    historicalOriginAvailable
+                            ? serverShotTimestampNanos
+                            : -1L
+            );
 
             bullet.setPositionAndDirectionFromShot(
                     isAimed,
                     shotYaw,
-                    shotPitch
+                    shotPitch,
+                    projectileOrigin
+            );
+
+            /*
+             * Simulate the projectile ticks that elapsed while the fire packet
+             * was travelling to the server.
+             *
+             * This keeps projectile position, ticksExisted and historical target
+             * timestamps on the same timeline.
+             */
+            if (historicalOriginAvailable) {
+
+                long elapsedNanos =
+                        System.nanoTime() - serverShotTimestampNanos;
+
+                int catchUpTicks = (int) Math.min(
+                        MAX_PROJECTILE_CATCH_UP_TICKS,
+                        Math.max(0L, elapsedNanos / COMBAT_TICK_NANOS)
+                );
+
+                for (int tick = 0;
+                     tick < catchUpTicks && !bullet.isDead;
+                     tick++) {
+
+                    bullet.onUpdate();
+                }
+
+                LOGGER.debug(
+                        "[MWC Combat][WeaponFireAspect#serverFire] "
+                                + "Projectile catch-up completed | Player={} | "
+                                + "CatchUpTicks={} | ShotAgeMs={} | Dead={}",
+                        player.getUniqueID(),
+                        catchUpTicks,
+                        elapsedNanos / 1_000_000.0D,
+                        bullet.isDead
+                );
+            }
+
+            /*
+             * A projectile that already hit something during catch-up must not
+             * be inserted into the world again.
+             */
+            if (!bullet.isDead) {
+                player.world.spawnEntity(bullet);
+            }
+        }
+
+        for (int i = 0; i < weapon.builder.pellets; i++) {
+
+            double damage = BalancePackManager.getNetGunDamage(weapon);
+
+            double hipFireSpread = 2.6;
+
+            if (BalancePackManager.hasActiveBalancePack()) {
+
+                hipFireSpread =
+                        BalancePackManager.getGlobalHipFireSpread();
+
+                hipFireSpread *=
+                        BalancePackManager.getGroupHipFireSpread(
+                                weapon.getConfigurationGroup()
+                        );
+            }
+
+            damage *= damageMultiplier;
+
+            WeaponSpawnEntity bullet = new WeaponSpawnEntity(
+                    weapon,
+                    player.world,
+                    player,
+                    weapon.getSpawnEntityVelocity(),
+                    weapon.getSpawnEntityGravityVelocity(),
+                    BalancePackManager.getInaccuracy(weapon)
+                            + (isAimed ? 0.0f : (float) hipFireSpread),
+                    (float) damage,
+                    weapon.getSpawnEntityExplosionRadius(),
+                    weapon.isDestroyingBlocks(),
+                    weapon.hasRocketParticles(),
+                    weapon.getParticleAgeCoefficient(),
+                    weapon.getSmokeParticleAgeCoefficient(),
+                    weapon.getExplosionScaleCoefficient(),
+                    weapon.getSmokeParticleScaleCoefficient(),
+                    0,
+                    0
+            );
+
+            bullet.setServerShotTimestampNanos(
+                    historicalOriginAvailable
+                            ? serverShotTimestampNanos
+                            : -1L
+            );
+
+            bullet.setPositionAndDirectionFromShot(
+                    isAimed,
+                    shotYaw,
+                    shotPitch,
+                    projectileOrigin
             );
 
             player.world.spawnEntity(bullet);

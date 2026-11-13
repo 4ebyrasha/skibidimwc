@@ -8,32 +8,18 @@ import java.util.Deque;
 /**
  * Bounded chronological history of one player's authoritative snapshots.
  *
- * <p>Instances are owned by {@link CombatHistoryManager} and must be
- * accessed exclusively from the logical server thread.</p>
- *
- * <p>Snapshots must have strictly increasing server-monotonic timestamps.
- * The history rejects duplicate or out-of-order timestamps and removes
- * entries exceeding its configured age or capacity limits.</p>
+ * <p>Instances are owned by CombatHistoryManager and accessed exclusively
+ * from the logical server thread.</p>
  *
  * <p>Historical queries never extrapolate. Interpolation is only permitted
- * between consecutive snapshots when their time gap does not exceed
- * {@link #MAX_INTERPOLATION_GAP_NANOS}.</p>
+ * between consecutive snapshots when their time gap is sufficiently small.</p>
  */
 public final class PlayerHistory {
 
-    /** Maximum number of snapshots retained for one player. */
     private static final int MAX_SNAPSHOTS = 64;
 
-    /** Maximum age of retained snapshots: two seconds. */
     private static final long MAX_AGE_NANOS = 2_000_000_000L;
 
-    /**
-     * Maximum permitted time gap between snapshots used for interpolation.
-     *
-     * <p>A larger gap indicates that the server did not capture a sufficiently
-     * continuous movement history. Interpolating across such a gap could
-     * produce a position that the player never occupied.</p>
-     */
     static final long MAX_INTERPOLATION_GAP_NANOS = 250_000_000L;
 
     private final Deque<PlayerSnapshot> snapshots = new ArrayDeque<>();
@@ -42,7 +28,7 @@ public final class PlayerHistory {
      * Adds a snapshot if its timestamp is newer than the latest entry.
      *
      * @param snapshot authoritative player snapshot
-     * @return {@code true} if the snapshot was accepted
+     * @return true if accepted
      */
     public boolean add(PlayerSnapshot snapshot) {
         if (snapshot == null) {
@@ -62,11 +48,6 @@ public final class PlayerHistory {
         return true;
     }
 
-    /**
-     * Removes snapshots that exceed the retention age or capacity.
-     *
-     * @param currentTimestamp timestamp of the newest accepted snapshot
-     */
     private void trim(long currentTimestamp) {
         while (!snapshots.isEmpty()) {
             PlayerSnapshot oldest = snapshots.peekFirst();
@@ -85,25 +66,10 @@ public final class PlayerHistory {
     }
 
     /**
-     * Resolves the player's state at a server-monotonic timestamp.
+     * Resolves a player's state at a server-monotonic timestamp.
      *
-     * <p>An exact snapshot match is returned without interpolation.
-     * Otherwise, the method searches for two consecutive snapshots
-     * surrounding the requested timestamp.</p>
-     *
-     * <p>Interpolation is rejected when:</p>
-     * <ul>
-     *     <li>The snapshots represent different players or entities.</li>
-     *     <li>The snapshots belong to different dimensions.</li>
-     *     <li>The timestamps are invalid or not strictly increasing.</li>
-     *     <li>The time gap between snapshots exceeds the permitted limit.</li>
-     * </ul>
-     *
-     * <p>The method never extrapolates beyond the retained history.</p>
-     *
-     * @param timestampNanos requested timestamp in the server's
-     *                       {@link System#nanoTime()} time domain
-     * @return resolved historical state, or {@code null} if unavailable
+     * @param timestampNanos requested server timestamp
+     * @return historical state, or null when unavailable
      */
     public HistoricalPlayerState getStateAt(long timestampNanos) {
         if (snapshots.isEmpty()) {
@@ -130,18 +96,10 @@ public final class PlayerHistory {
             previous = current;
         }
 
-        // The requested time is newer than the latest retained snapshot.
-        // Extrapolation is intentionally forbidden.
+        // Extrapolation beyond the newest snapshot is intentionally forbidden.
         return null;
     }
 
-    /**
-     * Converts a captured snapshot into a historical state.
-     *
-     * @param snapshot source snapshot
-     * @param timestampNanos requested timestamp
-     * @return immutable historical state
-     */
     private HistoricalPlayerState fromSnapshot(
             PlayerSnapshot snapshot,
             long timestampNanos
@@ -156,22 +114,11 @@ public final class PlayerHistory {
                 snapshot.getZ(),
                 snapshot.getYaw(),
                 snapshot.getPitch(),
+                snapshot.getEyeHeight(),
                 snapshot.getBoundingBox()
         );
     }
 
-    /**
-     * Interpolates a state between two consecutive snapshots.
-     *
-     * <p>Interpolation is only allowed when the snapshots are temporally
-     * close enough to represent a continuous movement interval. A large
-     * gap may indicate a server stall or missing movement updates.</p>
-     *
-     * @param from earlier snapshot
-     * @param to later snapshot
-     * @param timestampNanos requested timestamp
-     * @return interpolated state, or {@code null} if interpolation is unsafe
-     */
     private HistoricalPlayerState interpolate(
             PlayerSnapshot from,
             PlayerSnapshot to,
@@ -205,8 +152,23 @@ public final class PlayerHistory {
         double y = lerp(from.getY(), to.getY(), progress);
         double z = lerp(from.getZ(), to.getZ(), progress);
 
-        float yaw = interpolateAngle(from.getYaw(), to.getYaw(), progress);
-        float pitch = (float) lerp(from.getPitch(), to.getPitch(), progress);
+        float yaw = interpolateAngle(
+                from.getYaw(),
+                to.getYaw(),
+                progress
+        );
+
+        float pitch = (float) lerp(
+                from.getPitch(),
+                to.getPitch(),
+                progress
+        );
+
+        float eyeHeight = (float) lerp(
+                from.getEyeHeight(),
+                to.getEyeHeight(),
+                progress
+        );
 
         AxisAlignedBB fromBox = from.getBoundingBox();
         AxisAlignedBB toBox = to.getBoundingBox();
@@ -230,31 +192,19 @@ public final class PlayerHistory {
                 z,
                 yaw,
                 pitch,
+                eyeHeight,
                 boundingBox
         );
     }
 
-    /**
-     * Performs linear interpolation between two scalar values.
-     *
-     * @param from starting value
-     * @param to ending value
-     * @param progress interpolation factor in the range (0, 1)
-     * @return interpolated value
-     */
-    private static double lerp(double from, double to, double progress) {
+    private static double lerp(
+            double from,
+            double to,
+            double progress
+    ) {
         return from + (to - from) * progress;
     }
 
-    /**
-     * Interpolates an angle using the shortest path around the 360-degree
-     * circle.
-     *
-     * @param from starting angle in degrees
-     * @param to ending angle in degrees
-     * @param progress interpolation factor
-     * @return interpolated angle in degrees
-     */
     private static float interpolateAngle(
             float from,
             float to,
@@ -271,17 +221,14 @@ public final class PlayerHistory {
         return from + (float) (difference * progress);
     }
 
-    /** @return newest retained snapshot, or {@code null} if empty */
     public PlayerSnapshot getLatest() {
         return snapshots.peekLast();
     }
 
-    /** @return number of retained snapshots */
     public int size() {
         return snapshots.size();
     }
 
-    /** Removes all snapshots from this history. */
     public void clear() {
         snapshots.clear();
     }
