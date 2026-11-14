@@ -66,16 +66,28 @@ public final class TryFireMessageHandler
 
             UUID playerId = player.getUniqueID();
 
+            boolean hasClientTimestamp =
+                    message.hasClientShotTimestamp();
+
             long clientShotTimestampNanos =
-                    message.hasClientShotTimestamp()
+                    hasClientTimestamp
                             ? message.getClientShotTimestampNanos()
                             : serverPacketReceiveNanos;
 
+            /*
+             * A server receive timestamp must never be interpreted
+             * as a timestamp from the client's clock domain.
+             *
+             * Older message formats without a client timestamp use
+             * packet arrival time directly.
+             */
             long estimatedServerShotNanos =
-                    CombatClockSyncManager.getEstimatedServerTime(
+                    hasClientTimestamp
+                            ? CombatClockSyncManager.getEstimatedServerTime(
                             playerId,
                             clientShotTimestampNanos
-                    );
+                    )
+                            : -1L;
 
             boolean clockSynchronized = estimatedServerShotNanos > 0L;
 
@@ -122,6 +134,7 @@ public final class TryFireMessageHandler
                     "onMessage",
                     "Shot timestamp resolved"
                             + " | Player=" + playerId
+                            + " | HasClientTimestamp=" + hasClientTimestamp
                             + " | ClockSynchronized=" + clockSynchronized
                             + " | ClientShotNanos=" + clientShotTimestampNanos
                             + " | ServerReceiveNanos=" + serverPacketReceiveNanos
