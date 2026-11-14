@@ -221,6 +221,70 @@ public final class PlayerHistory {
         return from + (float) (difference * progress);
     }
 
+    /**
+     * Explains why a historical timestamp cannot be resolved.
+     *
+     * <p>This method is diagnostic only and does not modify history.</p>
+     *
+     * @param timestampNanos requested server timestamp
+     * @return reason code, or EXACT_SNAPSHOT / INTERPOLATION_AVAILABLE
+     */
+    public String getStateAtFailureReason(long timestampNanos) {
+        if (snapshots.isEmpty()) {
+            return "EMPTY_HISTORY";
+        }
+
+        PlayerSnapshot oldest = snapshots.peekFirst();
+        PlayerSnapshot newest = snapshots.peekLast();
+
+        if (timestampNanos < oldest.getTimestampNanos()) {
+            return "BEFORE_OLDEST_SNAPSHOT";
+        }
+
+        if (timestampNanos > newest.getTimestampNanos()) {
+            return "AFTER_NEWEST_SNAPSHOT";
+        }
+
+        PlayerSnapshot previous = null;
+
+        for (PlayerSnapshot current : snapshots) {
+            long currentTimestamp = current.getTimestampNanos();
+
+            if (timestampNanos == currentTimestamp) {
+                return "EXACT_SNAPSHOT";
+            }
+
+            if (timestampNanos < currentTimestamp) {
+                if (previous == null) {
+                    return "BEFORE_OLDEST_SNAPSHOT";
+                }
+
+                if (!previous.getPlayerId().equals(current.getPlayerId())
+                        || previous.getEntityId() != current.getEntityId()) {
+                    return "ENTITY_IDENTITY_CHANGED";
+                }
+
+                if (previous.getDimension() != current.getDimension()) {
+                    return "DIMENSION_CHANGED";
+                }
+
+                long gap = currentTimestamp - previous.getTimestampNanos();
+
+                if (gap > MAX_INTERPOLATION_GAP_NANOS) {
+                    return "INTERPOLATION_GAP_TOO_LARGE";
+                }
+
+                return "INTERPOLATION_AVAILABLE";
+            }
+
+            previous = current;
+        }
+
+        return "AFTER_NEWEST_SNAPSHOT";
+    }
+
+
+
     public PlayerSnapshot getLatest() {
         return snapshots.peekLast();
     }

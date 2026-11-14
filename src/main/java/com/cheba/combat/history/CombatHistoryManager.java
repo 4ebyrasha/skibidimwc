@@ -178,6 +178,30 @@ public final class CombatHistoryManager {
     }
 
     /**
+     * Returns the reason why a historical state is unavailable.
+     *
+     * @param playerId target player UUID
+     * @param timestampNanos requested server timestamp
+     * @return diagnostic reason code
+     */
+    public static String getHistoricalStateFailureReason(
+            UUID playerId,
+            long timestampNanos
+    ) {
+        if (playerId == null) {
+            return "INVALID_PLAYER_ID";
+        }
+
+        PlayerHistory history = HISTORIES.get(playerId);
+
+        if (history == null) {
+            return "NO_PLAYER_HISTORY";
+        }
+
+        return history.getStateAtFailureReason(timestampNanos);
+    }
+
+    /**
      * Invalidates a player's history after a movement timeline discontinuity.
      *
      * @param playerId UUID of the player

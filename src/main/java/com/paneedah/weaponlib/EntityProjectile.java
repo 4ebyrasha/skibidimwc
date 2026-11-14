@@ -4,8 +4,13 @@ import com.paneedah.mwc.network.messages.BlockHitMessage;
 import com.paneedah.mwc.utils.MWCUtil;
 import com.paneedah.mwc.utils.VectorUtil;
 import com.paneedah.weaponlib.config.ModernConfigManager;
-import io.netty.buffer.ByteBuf;
+import com.cheba.combat.history.CombatHistoryManager;
+import com.cheba.combat.history.HistoricalPlayerState;
+import com.cheba.combat.logging.CombatLog;
+
 import dev.redstudio.redcore.math.vectors.Vector3D;
+import io.netty.buffer.ByteBuf;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
@@ -13,19 +18,17 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.IProjectile;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.math.*;
 import net.minecraft.world.World;
+
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import com.cheba.combat.history.CombatHistoryManager;
-import com.cheba.combat.history.HistoricalPlayerState;
-import net.minecraft.entity.player.EntityPlayerMP;
 
 import static com.paneedah.mwc.MWC.CHANNEL;
 
@@ -43,13 +46,12 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     private int xTile = -1;
     private int yTile = -1;
     private int zTile = -1;
-    //private IBlockState field_145785_f;
+
     protected boolean inGround;
     public int throwableShake;
 
     protected EntityLivingBase thrower;
     private String throwerName;
-    //private int ticksInGround;
     private int ticksInAir;
 
     protected float gravityVelocity;
@@ -75,17 +77,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         this.velocity = velocity;
         this.gravityVelocity = gravityVelocity;
         this.inaccuracy = inaccuracy;
-
-//        if(thrower != null) {
-//            RayTraceResult rayTraceResult = thrower.rayTrace(50, 0);
-//            if(rayTraceResult != null && rayTraceResult.hitVec != null) {
-//                double dx = MC.player.posX - rayTraceResult.hitVec.x;
-//                double dy = MC.player.posY - rayTraceResult.hitVec.y;
-//                double dz = MC.player.posZ - rayTraceResult.hitVec.z;
-//                double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-//                this.aimTan = 0.4 / distance;
-//            }
-//        }
     }
 
     /**
@@ -232,13 +223,11 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         float f3 = MathHelper.sqrt(x * x + z * z);
         this.prevRotationYaw = this.rotationYaw = (float) (Math.atan2(x, z) * 180.0D / Math.PI);
         this.prevRotationPitch = this.rotationPitch = (float) (Math.atan2(y, f3) * 180.0D / Math.PI);
-        //this.ticksInGround = 0;
     }
 
     /**
      * Sets the velocity to the args. Args: x, y, z
      */
-    // @SideOnly(Side.CLIENT)
     public void setVelocity(double mX, double mY, double mZ) {
         this.motionX = mX;
         this.motionY = mY;
@@ -247,8 +236,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         if (this.prevRotationPitch == 0.0F && this.prevRotationYaw == 0.0F) {
             float f = MathHelper.sqrt(mX * mX + mZ * mZ);
             this.prevRotationYaw = this.rotationYaw = (float) (Math.atan2(mX, mZ) * 180.0D / Math.PI);
-            this.prevRotationPitch = this.rotationPitch = (float) (Math.atan2(mY, f) * 180.0D
-                    / Math.PI);
+            this.prevRotationPitch = this.rotationPitch = (float) (Math.atan2(mY, f) * 180.0D / Math.PI);
         }
     }
 
@@ -257,7 +245,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      */
     public void onUpdate() {
         if (ticksExisted > MAX_TICKS) {
-            setDead(); // истекшие пули теперь удаляются из мира
+            setDead();
             return;
         }
 
@@ -271,26 +259,11 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         if (this.inGround) {
-            /*
-            BlockPos p = new BlockPos(this.xTile, this.yTile, this.zTile);
-            if (compatibility.getBlockAtPosition(world, p) == this.field_145785_f) {
-                ++this.ticksInGround;
-
-                if (this.ticksInGround == 1200) {
-                    this.setDead();
-                }
-
-                return;
-            }
-            */
-
             this.inGround = false;
             this.motionX *= this.rand.nextFloat() * 0.2F;
             this.motionY *= this.rand.nextFloat() * 0.2F;
             this.motionZ *= this.rand.nextFloat() * 0.2F;
-            //this.ticksInGround = 0;
             this.ticksInAir = 0;
-
         } else {
             ++this.ticksInAir;
         }
@@ -298,15 +271,11 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         Vector3D vec3 = new Vector3D(this.posX, this.posY, this.posZ);
         Vector3D vec31 = new Vector3D(this.posX + this.motionX, this.posY + this.motionY, this.posZ + this.motionZ);
 
-        //List<BlockPos> possibleCollisions = new ArrayList<>();
-
-        // Check what is at the projectile current position, null if air
         RayTraceResult movingobjectposition = MWCUtil.rayTraceBlocks(world, vec3, vec31, (block, blockMetadata) -> canCollideWithBlock(null, block, null, blockMetadata));
 
         /*
-         *  GLASS BREAK CHECK
+         * GLASS BREAK CHECK
          */
-
         if (ModernConfigManager.bulletBreakGlass && !world.isRemote) {
             Vec3d motion = new Vec3d(this.motionX, this.motionY, this.motionZ);
             Vec3d start = new Vec3d(this.prevPosX, this.prevPosY, this.prevPosZ);
@@ -369,7 +338,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         this.rotationPitch = this.prevRotationPitch + (this.rotationPitch - this.prevRotationPitch) * 0.2F;
         this.rotationYaw = this.prevRotationYaw + (this.rotationYaw - this.prevRotationYaw) * 0.2F;
         float f2 = 0.99F;
-        float f3 = gravityVelocity; //this.getGravityVelocity();
+        float f3 = gravityVelocity;
 
         if (this.isInWater()) {
             for (int i = 0; i < 4; ++i) {
@@ -433,8 +402,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         /*
          * Historical player positions can be outside the current projectile
          * search box. Add every player in this world to the candidate list.
-         *
-         * The contains check prevents processing players twice.
          */
         if (!world.isRemote) {
             for (EntityPlayer player : world.playerEntities) {
@@ -479,16 +446,14 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
             /*
              * Preserve the original shooter collision grace period.
-             * The shooter can become a collision target after five ticks.
              */
             if (target == shooter && ticksInAir < 5) {
                 continue;
             }
 
             /*
-             * Historical collision is only available for server-side players.
-             * A valid historical state prevents fallback to the player's
-             * current position, even when the historical box was not hit.
+             * Historical collision is available only when the target
+             * has a valid state at the projectile segment midpoint.
              */
             if (target instanceof EntityPlayerMP
                     && shotTimestampNanos > 0L) {
@@ -513,9 +478,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                                 midpointNanos
                         );
 
-                if (midpointState != null
-                        && midpointState.getEntityId() == player.getEntityId()
-                        && midpointState.getDimension() == player.dimension) {
+                if (isValidHistoricalState(player, midpointState)) {
 
                     RayTraceResult historicalHit =
                             findHistoricalPlayerIntersection(
@@ -539,6 +502,39 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
                     continue;
                 }
+
+                String failureReason;
+
+                if (midpointState == null) {
+                    failureReason =
+                            CombatHistoryManager.getHistoricalStateFailureReason(
+                                    player.getUniqueID(),
+                                    midpointNanos
+                            );
+                } else if (midpointState.getEntityId() != player.getEntityId()) {
+                    failureReason = "ENTITY_ID_MISMATCH";
+                } else {
+                    failureReason = "DIMENSION_MISMATCH";
+                }
+
+                CombatLog.trace(
+                        "EntityProjectile",
+                        "getRayTraceEntities",
+                        "Historical target state unavailable"
+                                + " | Projectile=" + getEntityId()
+                                + " | Shooter="
+                                + (shooter == null
+                                ? "null"
+                                : shooter.getUniqueID())
+                                + " | Target=" + player.getUniqueID()
+                                + " | TargetEntityId=" + player.getEntityId()
+                                + " | TargetDimension=" + player.dimension
+                                + " | SegmentStart=" + segmentStartNanos
+                                + " | SegmentEnd=" + segmentEndNanos
+                                + " | Midpoint=" + midpointNanos
+                                + " | Reason=" + failureReason
+                                + " | Fallback=CurrentAABB"
+                );
             }
 
             /*
@@ -568,7 +564,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
         return nearestHit;
     }
-
 
     /**
      * Finds an intersection between a projectile segment and a player
@@ -628,6 +623,41 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                         player.getUniqueID(),
                         segmentEndNanos
                 );
+
+        if (!isValidHistoricalState(player, startState)
+                || !isValidHistoricalState(player, endState)) {
+
+            String startReason =
+                    isValidHistoricalState(player, startState)
+                            ? "AVAILABLE"
+                            : startState == null
+                            ? CombatHistoryManager.getHistoricalStateFailureReason(
+                            player.getUniqueID(),
+                            segmentStartNanos
+                    )
+                            : "INVALID_START_STATE";
+
+            String endReason =
+                    isValidHistoricalState(player, endState)
+                            ? "AVAILABLE"
+                            : endState == null
+                            ? CombatHistoryManager.getHistoricalStateFailureReason(
+                            player.getUniqueID(),
+                            segmentEndNanos
+                    )
+                            : "INVALID_END_STATE";
+
+            CombatLog.trace(
+                    "EntityProjectile",
+                    "findHistoricalPlayerIntersection",
+                    "Historical boundary snapshot unavailable"
+                            + " | Projectile=" + getEntityId()
+                            + " | Target=" + player.getUniqueID()
+                            + " | StartReason=" + startReason
+                            + " | EndReason=" + endReason
+                            + " | Midpoint=" + midpointNanos
+            );
+        }
 
         /*
          * At the edge of retained history one boundary may be unavailable
@@ -737,8 +767,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 && state.getDimension() == player.dimension;
     }
 
-
-
     /**
      * Called when this EntityThrowable hits a block or entity.
      */
@@ -752,11 +780,11 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         tagCompound.setShort("xTile", (short) this.xTile);
         tagCompound.setShort("yTile", (short) this.yTile);
         tagCompound.setShort("zTile", (short) this.zTile);
-        //tagCompound.setByte("inTile", (byte) Block.getIdFromBlock(this.field_145785_f));
         tagCompound.setByte("shake", (byte) this.throwableShake);
         tagCompound.setByte("inGround", (byte) (this.inGround ? 1 : 0));
 
-        if ((this.throwerName == null || this.throwerName.length() == 0) && this.thrower != null
+        if ((this.throwerName == null || this.throwerName.length() == 0)
+                && this.thrower != null
                 && this.thrower instanceof EntityPlayer) {
             this.throwerName = this.thrower.getName();
         }
@@ -774,7 +802,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         this.xTile = tagCompound.getShort("xTile");
         this.yTile = tagCompound.getShort("yTile");
         this.zTile = tagCompound.getShort("zTile");
-        //this.field_145785_f = Block.getBlockById(tagCompound.getByte("inTile") & 255);
         this.throwableShake = tagCompound.getByte("shake") & 255;
         this.inGround = tagCompound.getByte("inGround") == 1;
         this.throwerName = tagCompound.getString("ownerName");
@@ -782,6 +809,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         if (this.throwerName != null && this.throwerName.length() == 0) {
             this.throwerName = null;
         }
+
         this.gravityVelocity = tagCompound.getFloat(TAG_GRAVITY_VELOCITY);
         this.timestamp = tagCompound.getLong("timestamp");
         this.aimTan = tagCompound.getDouble("aimTan");
@@ -803,7 +831,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         aimTan = buffer.readDouble();
     }
 
-    // @SideOnly(Side.CLIENT)
     public float getShadowSize() {
         return 0.0F;
     }
@@ -813,13 +840,14 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     }
 
     public EntityLivingBase getThrower() {
-        if (this.thrower == null && this.throwerName != null && this.throwerName.length() > 0) {
+        if (this.thrower == null
+                && this.throwerName != null
+                && this.throwerName.length() > 0) {
             this.thrower = world.getPlayerEntityByName(this.throwerName);
         }
 
         return this.thrower;
     }
-
 
     protected void entityInit() {
     }
@@ -829,7 +857,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      * and comparing it to its average edge length * 64 * renderDistanceWeight
      * Args: distance
      */
-    // @SideOnly(Side.CLIENT)
     public boolean isInRangeToRenderDist(double p_70112_1_) {
         double d1 = this.getEntityBoundingBox().getAverageEdgeLength() * 4.0D;
         d1 *= 64.0D;
