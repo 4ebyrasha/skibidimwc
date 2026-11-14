@@ -12,6 +12,7 @@
 !/gradlew
 !/gradlew.bat
 !/gradle/
+!/test_logs/
 
 # Allow Gradle wrapper
 !/gradle/wrapper/
@@ -27,4 +28,3 @@
 /.idea/
 /libs/
 /backup/
-/test_logs/
