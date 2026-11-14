@@ -319,9 +319,10 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         float f1 = MathHelper.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ);
         this.rotationYaw = (float) (Math.atan2(this.motionX, this.motionZ) * 180.0D / Math.PI);
 
-        for (this.rotationPitch = (float) (Math.atan2(this.motionY, f1) * 180.0D / Math.PI);
-             this.rotationPitch - this.prevRotationPitch < -180.0F; this.prevRotationPitch -= 360.0F)
-            ;
+        this.rotationPitch = (float) (Math.atan2(this.motionY, f1) * 180.0D / Math.PI);
+        while (this.rotationPitch - this.prevRotationPitch < -180.0F) {
+            this.prevRotationPitch -= 360.0F;
+        }
 
         while (this.rotationPitch - this.prevRotationPitch >= 180.0F) {
             this.prevRotationPitch += 360.0F;
@@ -783,7 +784,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         tagCompound.setByte("shake", (byte) this.throwableShake);
         tagCompound.setByte("inGround", (byte) (this.inGround ? 1 : 0));
 
-        if ((this.throwerName == null || this.throwerName.length() == 0)
+        if ((this.throwerName == null || this.throwerName.isEmpty())
                 && this.thrower != null
                 && this.thrower instanceof EntityPlayer) {
             this.throwerName = this.thrower.getName();
@@ -806,7 +807,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         this.inGround = tagCompound.getByte("inGround") == 1;
         this.throwerName = tagCompound.getString("ownerName");
 
-        if (this.throwerName != null && this.throwerName.length() == 0) {
+        if (this.throwerName.isEmpty()) {
             this.throwerName = null;
         }
 
@@ -842,7 +843,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     public EntityLivingBase getThrower() {
         if (this.thrower == null
                 && this.throwerName != null
-                && this.throwerName.length() > 0) {
+                && !this.throwerName.isEmpty()) {
             this.thrower = world.getPlayerEntityByName(this.throwerName);
         }
 
