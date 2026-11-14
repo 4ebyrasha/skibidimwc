@@ -7,6 +7,7 @@ import com.paneedah.mwc.utils.HitUtil;
 import com.paneedah.mwc.utils.MWCUtil;
 import com.paneedah.mwc.utils.VectorUtil;
 import com.paneedah.weaponlib.config.ModernConfigManager;
+import com.cheba.combat.time.CombatClockSyncManager;
 import io.netty.buffer.ByteBuf;
 import dev.redstudio.redcore.math.vectors.Vector3F;
 import lombok.Getter;
@@ -76,9 +77,10 @@ public class WeaponSpawnEntity extends EntityProjectile {
 
     /**
      * Estimated server-monotonic timestamp when this projectile was fired.
-     * A value of -1 means that no synchronized shot timestamp was supplied.
+     * Long.MIN_VALUE means that no synchronized shot timestamp was supplied.
      */
-    private long serverShotTimestampNanos = -1L;
+    private long serverShotTimestampNanos =
+            CombatClockSyncManager.NO_ESTIMATE;
 
     @SuppressWarnings("all")
     private Vec3d startPos;
@@ -275,7 +277,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
     /**
      * Returns the estimated server-monotonic time of the original shot.
      *
-     * @return shot timestamp in nanoseconds, or -1 when unavailable
+     * @return shot timestamp in nanoseconds, or Long.MIN_VALUE when unavailable
      */
     public long getServerShotTimestampNanos() {
         return serverShotTimestampNanos;
@@ -284,11 +286,10 @@ public class WeaponSpawnEntity extends EntityProjectile {
     /**
      * Sets the estimated server-monotonic time of the original shot.
      *
-     * @param timestampNanos server-monotonic timestamp
+     * @param timestampNanos server-monotonic timestamp, or Long.MIN_VALUE when unavailable
      */
     public void setServerShotTimestampNanos(long timestampNanos) {
-        this.serverShotTimestampNanos =
-                timestampNanos > 0L ? timestampNanos : -1L;
+        this.serverShotTimestampNanos = timestampNanos;
     }
 
     @Override
@@ -460,6 +461,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
         spawnRocketParticles = tagCompound.getBoolean(TAG_IS_SPAWN_ROCKET_PARTICLES);
         explosionParticleAgeCoefficient = tagCompound.getFloat(TAG_EXPLOSION_PARTICLE_AGE_COEFFICIENT);
         smokeParticleAgeCoefficient = tagCompound.getFloat(TAG_SMOKE_PARTICLE_AGE_COEFFICIENT);
+        explosionParticleScaleCoefficient = tagCompound.getFloat(TAG_EXPLOSION_PARTICLE_SCALE_COEFFICIENT);
         explosionParticleScaleCoefficient = tagCompound.getFloat(TAG_EXPLOSION_PARTICLE_SCALE_COEFFICIENT);
         smokeParticleScaleCoefficient = tagCompound.getFloat(TAG_SMOKE_PARTICLE_SCALE_COEFFICIENT);
         explosionParticleTextureId = tagCompound.getInteger(TAG_EXPLOSION_PARTICLE_TEXTURE_ID);
