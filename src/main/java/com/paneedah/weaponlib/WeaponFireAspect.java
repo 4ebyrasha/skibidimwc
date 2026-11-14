@@ -720,10 +720,14 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
      * Performs server-side weapon firing.
      *
      * <p>The original client timestamp is retained for remote audio.
-     * The translated server timestamp is used for historical hit registration.</p>
+     * The translated server timestamp is used for historical hit registration
+     * when the historical shooter origin is available.</p>
      *
-     * <p>When historical shooter state is unavailable, projectiles use the
-     * current shooter position and historical target rewind is disabled.</p>
+     * <p>If the historical shooter origin is unavailable, the projectile starts
+     * at the current shooter position. Its collision timeline is anchored to
+     * the moment that position is captured. This preserves historical target
+     * collision without incorrectly combining a current origin with an old
+     * shot timestamp.</p>
      *
      * @param player shooter
      * @param itemStack weapon stack
@@ -759,7 +763,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             return;
         }
 
-        long serverReceiveTimestampNanos = System.nanoTime();
+        final long serverReceiveTimestampNanos = System.nanoTime();
 
         Weapon weapon = (Weapon) itemStack.getItem();
 
@@ -772,9 +776,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         /*
          * Apply the fire-rate limit centrally.
-         *
-         * This covers every serverFire() overload and prevents
-         * empty-ammo requests from consuming the cooldown.
+         * Empty-ammo requests must not consume the cooldown.
          */
         if (player instanceof EntityPlayerMP) {
             long rateLimitTimestamp = serverShotTimestampNanos > 0L
@@ -867,9 +869,14 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         }
 
         /*
-         * Resolve the historical shooter eye position.
-         * Never move the live player entity backwards in time.
+         * Capture the current origin and its timestamp together.
+         *
+         * This timestamp is used only if historical shooter state cannot
+         * be reconstructed. It must never be paired with the old client
+         * shot timestamp.
          */
+        final long currentOriginTimestampNanos = System.nanoTime();
+
         Vec3d projectileOrigin = new Vec3d(
                 player.posX,
                 player.posY + player.getEyeHeight(),
@@ -878,9 +885,21 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         boolean historicalOriginAvailable = false;
 
-        if (player instanceof EntityPlayerMP
-                && serverShotTimestampNanos > 0L) {
+        /*
+         * This is the timestamp used by EntityProjectile to map each
+         * physical projectile segment onto the target history timeline.
+         *
+         * - Historical origin: original translated shot timestamp.
+         * - Current origin fallback: timestamp captured with current origin.
+         * - Non-player shooters or unavailable shot timestamp: disabled.
+         */
+        long projectileTimelineTimestampNanos = -1L;
 
+        boolean historicalTimelineEligible =
+                player instanceof EntityPlayerMP
+                        && serverShotTimestampNanos > 0L;
+
+        if (historicalTimelineEligible) {
             EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
 
             HistoricalPlayerState shooterState =
@@ -900,26 +919,49 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 );
 
                 historicalOriginAvailable = true;
+                projectileTimelineTimestampNanos =
+                        serverShotTimestampNanos;
 
             } else {
+                /*
+                 * The old shot timestamp cannot describe the current origin.
+                 * Anchor the projectile timeline to the current origin instead.
+                 */
+                projectileTimelineTimestampNanos =
+                        currentOriginTimestampNanos;
+
                 LOGGER.debug(
                         "[MWC Combat][WeaponFireAspect#serverFire] "
                                 + "Historical shooter origin unavailable; "
-                                + "rewind disabled | Player={} | "
-                                + "ShotTimestamp={} | StateAvailable={}",
+                                + "using current origin with independent timeline "
+                                + "| Player={} | ShotTimestamp={} | "
+                                + "CurrentOriginTimestamp={} | StateAvailable={} | "
+                                + "StateEntityId={} | ExpectedEntityId={} | "
+                                + "StateDimension={} | CurrentDimension={}",
                         serverPlayer.getUniqueID(),
                         serverShotTimestampNanos,
-                        shooterState != null
+                        currentOriginTimestampNanos,
+                        shooterState != null,
+                        shooterState == null ? -1 : shooterState.getEntityId(),
+                        serverPlayer.getEntityId(),
+                        shooterState == null ? -1 : shooterState.getDimension(),
+                        serverPlayer.dimension
                 );
             }
         }
 
         /*
-         * Calculate catch-up once so every pellet from this shot
-         * uses the same simulation age.
+         * Catch-up is valid only when both the historical origin and the
+         * original shot timestamp are available.
+         *
+         * A current-origin fallback starts now and must not simulate
+         * projectile movement from an earlier time.
          */
         long projectileAgeNanos = historicalOriginAvailable
-                ? Math.max(0L, System.nanoTime() - serverShotTimestampNanos)
+                ? Math.max(
+                0L,
+                System.nanoTime() - serverShotTimestampNanos
+        )
                 : 0L;
 
         int catchUpTicks = historicalOriginAvailable
@@ -963,10 +1005,12 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     0
             );
 
+            /*
+             * This value is the projectile's collision timeline anchor.
+             * It is intentionally not always the original shot timestamp.
+             */
             bullet.setServerShotTimestampNanos(
-                    historicalOriginAvailable
-                            ? serverShotTimestampNanos
-                            : -1L
+                    projectileTimelineTimestampNanos
             );
 
             bullet.setPositionAndDirectionFromShot(
@@ -1001,10 +1045,13 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     "[MWC Combat][WeaponFireAspect#serverFire] "
                             + "Projectile catch-up completed | "
                             + "Player={} | Pellet={}/{} | "
+                            + "HistoricalOrigin={} | TimelineTimestamp={} | "
                             + "CatchUpTicks={} | ShotAgeMs={} | Dead={}",
                     player.getUniqueID(),
                     i + 1,
                     weapon.builder.pellets,
+                    historicalOriginAvailable,
+                    projectileTimelineTimestampNanos,
                     catchUpTicks,
                     projectileAgeNanos / 1_000_000.0D,
                     bullet.isDead
