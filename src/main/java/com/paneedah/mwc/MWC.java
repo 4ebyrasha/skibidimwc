@@ -7,6 +7,8 @@ import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.effect.BulletSuppressionEffect;
+import com.cheba.knockback.KnockbackCapability;
+import com.cheba.knockback.KnockbackCapabilityHandler;
 import com.cheba.m.GuiHandler;
 import com.paneedah.mwc.creativetab.*;
 import com.paneedah.mwc.gui.HUD;
@@ -89,6 +91,9 @@ public final class MWC {
             MinecraftForge.EVENT_BUS.register(new BulletSuppressionEffect());
             MinecraftForge.EVENT_BUS.register(new VectorMath());
         }
+
+        KnockbackCapability.register();
+        MinecraftForge.EVENT_BUS.register(KnockbackCapabilityHandler.class);
 
         commonProxy.preInit(this);
     }
