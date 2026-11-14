@@ -134,8 +134,7 @@ public final class PlayerHistory {
         long toTimestamp = to.getTimestampNanos();
 
         if (timestampNanos <= fromTimestamp
-                || timestampNanos >= toTimestamp
-                || toTimestamp <= fromTimestamp) {
+                || timestampNanos >= toTimestamp) {
             return null;
         }
 
@@ -282,8 +281,6 @@ public final class PlayerHistory {
 
         return "AFTER_NEWEST_SNAPSHOT";
     }
-
-
 
     public PlayerSnapshot getLatest() {
         return snapshots.peekLast();

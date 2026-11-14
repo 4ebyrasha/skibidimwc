@@ -104,13 +104,11 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
     private static final Predicate<PlayerWeaponInstance> ejectSpentRoundTimeoutExpired =
             instance -> {
 
-                boolean time = System.currentTimeMillis()
-                        >= instance.getWeapon().builder.pumpTimeoutMilliseconds
-                        + instance.getStateUpdateTimestamp();
-
                 // HERE
 
-                return time;
+                return System.currentTimeMillis()
+                        >= instance.getWeapon().builder.pumpTimeoutMilliseconds
+                        + instance.getStateUpdateTimestamp();
             };
 
     private static final Predicate<PlayerWeaponInstance> alertTimeoutExpired =
@@ -425,7 +423,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         // Local shooter's sound.
         if (!FMLCommonHandler.instance().getSide().isServer()) {
 
-            SoundEvent shooterSound = null;
+            SoundEvent shooterSound;
 
             boolean shooterIndoor = isShooterIndoor(player);
 
@@ -505,10 +503,14 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         float recoilAmount = weaponInstance.getRecoil();
 
-        recoilAmount *= BalancePackManager.getGlobalRecoilMultiplier();
+        recoilAmount = (float) (
+                recoilAmount * BalancePackManager.getGlobalRecoilMultiplier()
+        );
 
-        recoilAmount *= BalancePackManager.getGroupRecoilMultiplier(
-                weapon.getConfigurationGroup()
+        recoilAmount = (float) (
+                recoilAmount * BalancePackManager.getGroupRecoilMultiplier(
+                        weapon.getConfigurationGroup()
+                )
         );
 
         player.rotationPitch = player.rotationPitch - recoilAmount * 0.7f;
@@ -767,6 +769,24 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         Weapon weapon = (Weapon) itemStack.getItem();
 
+        /*
+         * Resolve the projectile factory before consuming ammunition.
+         * Weapon.Builder normally supplies the default factory, while
+         * callers may provide a custom implementation.
+         */
+        if (spawnEntityWith == null) {
+            spawnEntityWith = weapon.builder.spawnEntityWith;
+        }
+
+        if (spawnEntityWith == null) {
+            LOGGER.error(
+                    "[MWC Combat][WeaponFireAspect#serverFire] "
+                            + "Projectile factory is unavailable | Weapon={}",
+                    weapon.getName()
+            );
+            return;
+        }
+
         int currentServerAmmo = Tags.getAmmo(itemStack);
 
         if (currentServerAmmo <= 0) {
@@ -863,10 +883,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         final double maxDistSq =
                 broadcastRadius * broadcastRadius;
-
-        if (spawnEntityWith == null) {
-            spawnEntityWith = weapon.builder.spawnEntityWith;
-        }
 
         /*
          * Capture the current origin and its timestamp together.
@@ -973,7 +989,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         for (int i = 0; i < weapon.builder.pellets; i++) {
 
-            double damage = BalancePackManager.getNetGunDamage(weapon);
             double hipFireSpread = 2.6D;
 
             if (BalancePackManager.hasActiveBalancePack()) {
@@ -983,27 +998,33 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 );
             }
 
-            damage *= damageMultiplier;
+            /*
+             * Use the weapon-configured factory instead of constructing a
+             * generic projectile directly. This preserves custom projectile
+             * implementations and all builder-configured projectile properties.
+             */
+            WeaponSpawnEntity bullet = spawnEntityWith.apply(weapon, player);
 
-            WeaponSpawnEntity bullet = new WeaponSpawnEntity(
-                    weapon,
-                    player.world,
-                    player,
-                    weapon.getSpawnEntityVelocity(),
-                    weapon.getSpawnEntityGravityVelocity(),
-                    BalancePackManager.getInaccuracy(weapon)
-                            + (isAimed ? 0.0F : (float) hipFireSpread),
-                    (float) damage,
-                    weapon.getSpawnEntityExplosionRadius(),
-                    weapon.isDestroyingBlocks(),
-                    weapon.hasRocketParticles(),
-                    weapon.getParticleAgeCoefficient(),
-                    weapon.getSmokeParticleAgeCoefficient(),
-                    weapon.getExplosionScaleCoefficient(),
-                    weapon.getSmokeParticleScaleCoefficient(),
-                    0,
-                    0
-            );
+            if (bullet == null) {
+                LOGGER.error(
+                        "[MWC Combat][WeaponFireAspect#serverFire] "
+                                + "Projectile factory returned null | Weapon={} | Pellet={}/{}",
+                        weapon.getName(),
+                        i + 1,
+                        weapon.builder.pellets
+                );
+                continue;
+            }
+
+            /*
+             * Apply current balance-pack accuracy and hip-fire spread.
+             * The factory initializes the projectile using its default parameters;
+             * the authoritative shot direction and origin are applied below.
+             */
+            bullet.inaccuracy = BalancePackManager.getInaccuracy(weapon)
+                    + (isAimed ? 0.0F : (float) hipFireSpread);
+
+            bullet.applyDamageMultiplier(damageMultiplier);
 
             /*
              * This value is the projectile's collision timeline anchor.

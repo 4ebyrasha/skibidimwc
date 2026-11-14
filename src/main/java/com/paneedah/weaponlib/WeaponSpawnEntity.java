@@ -120,6 +120,15 @@ public class WeaponSpawnEntity extends EntityProjectile {
         this.setSize(0.30F, 0.30F);
     }
 
+    /**
+     * Applies an additional damage multiplier to this projectile.
+     *
+     * @param multiplier damage multiplier
+     */
+    public void applyDamageMultiplier(float multiplier) {
+        this.damage *= multiplier;
+    }
+
     @Override
     public void onUpdate() {
         if (!world.isRemote && prevPosOnServer == null) {

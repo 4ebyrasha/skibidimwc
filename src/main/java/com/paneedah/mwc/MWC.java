@@ -4,6 +4,7 @@ import com.cheba.Run;
 import com.cheba.combat.fire.ServerFireRateLimiter;
 import com.cheba.combat.handlers.CombatHistoryEventHandler;
 import com.cheba.combat.history.CombatHistoryManager;
+import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.effect.BulletSuppressionEffect;
 import com.cheba.m.GuiHandler;
@@ -94,6 +95,9 @@ public final class MWC {
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent initializationEvent) {
+
+        CombatLog.setTraceEnabled(true);
+
         MinecraftForge.EVENT_BUS.register(CommonEventHandler.class);
         MinecraftForge.EVENT_BUS.register(CombatHistoryEventHandler.class);
         FMLCommonHandler.instance().bus().register(CombatHistoryEventHandler.class);
