@@ -38,9 +38,7 @@ public final class ServerFireRateLimiter {
             Weapon weapon,
             long shotTimestampNanos
     ) {
-        if (player == null
-                || weapon == null
-                || shotTimestampNanos <= 0L) {
+        if (player == null || weapon == null) {
             return false;
         }
 

@@ -26,6 +26,13 @@ import java.util.concurrent.ConcurrentMap;
  */
 public final class CombatClockSyncManager {
 
+    /**
+     * Returned when no valid server-time estimate is available.
+     *
+     * <p>Zero and negative values are valid System.nanoTime() timestamps.</p>
+     */
+    public static final long NO_ESTIMATE = Long.MIN_VALUE;
+
     private static final long PENDING_TIMEOUT_NANOS = 5_000_000_000L;
     private static final long MAX_CLIENT_RTT_NANOS = 2_000_000_000L;
     private static final long MAX_SERVER_PROCESSING_NANOS = 1_000_000_000L;
@@ -63,8 +70,6 @@ public final class CombatClockSyncManager {
     ) {
         if (playerId == null
                 || nonce == 0L
-                || clientSendNanos <= 0L
-                || serverReceiveNanos <= 0L
                 || serverSendNanos < serverReceiveNanos) {
             CombatLog.warn(
                     "CombatClockSyncManager",
@@ -298,19 +303,19 @@ public final class CombatClockSyncManager {
      *
      * @param playerId player UUID
      * @param clientTimestampNanos client timestamp
-     * @return estimated server timestamp, or -1 when no fresh estimate exists
+     * @return estimated server timestamp, or NO_ESTIMATE when no fresh estimate exists
      */
     public static long getEstimatedServerTime(
             UUID playerId,
             long clientTimestampNanos
     ) {
-        if (playerId == null || clientTimestampNanos <= 0L) {
-            return -1L;
+        if (playerId == null) {
+            return NO_ESTIMATE;
         }
 
         PlayerClockState state = STATES.get(playerId);
         if (state == null) {
-            return -1L;
+            return NO_ESTIMATE;
         }
 
         synchronized (state) {
@@ -318,13 +323,20 @@ public final class CombatClockSyncManager {
 
             if (!state.synchronizedClock
                     || now - state.lastUpdateNanos > ESTIMATE_MAX_AGE_NANOS) {
-                return -1L;
+                return NO_ESTIMATE;
             }
 
             double estimated = (double) clientTimestampNanos + state.offsetNanos;
 
-            if (estimated <= 0.0D || estimated >= Long.MAX_VALUE) {
-                return -1L;
+            /*
+             * Long.MIN_VALUE is reserved as NO_ESTIMATE.
+             * Negative and zero timestamps are otherwise valid.
+             */
+            if (Double.isNaN(estimated)
+                    || Double.isInfinite(estimated)
+                    || estimated <= (double) Long.MIN_VALUE
+                    || estimated >= (double) Long.MAX_VALUE) {
+                return NO_ESTIMATE;
             }
 
             return Math.round(estimated);
@@ -338,7 +350,10 @@ public final class CombatClockSyncManager {
      * @return true when the estimate is fresh
      */
     public static boolean isSynchronized(UUID playerId) {
-        return getEstimatedServerTime(playerId, System.nanoTime()) > 0L;
+        return getEstimatedServerTime(
+                playerId,
+                System.nanoTime()
+        ) != NO_ESTIMATE;
     }
 
     /**

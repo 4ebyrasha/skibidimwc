@@ -87,18 +87,23 @@ public final class TryFireMessageHandler
                             playerId,
                             clientShotTimestampNanos
                     )
-                            : -1L;
+                            : CombatClockSyncManager.NO_ESTIMATE;
 
-            boolean clockSynchronized = estimatedServerShotNanos > 0L;
+            boolean clockSynchronized =
+                    estimatedServerShotNanos
+                            != CombatClockSyncManager.NO_ESTIMATE;
 
             if (!clockSynchronized) {
                 estimatedServerShotNanos = serverPacketReceiveNanos;
             }
 
-            long oldestAllowedTimestamp = Math.max(
-                    1L,
-                    serverPacketReceiveNanos - MAX_REWIND_NANOS
-            );
+            long oldestAllowedTimestamp =
+                    serverPacketReceiveNanos - MAX_REWIND_NANOS;
+
+            // Protect the lower bound against signed long underflow.
+            if (oldestAllowedTimestamp > serverPacketReceiveNanos) {
+                oldestAllowedTimestamp = Long.MIN_VALUE;
+            }
 
             long serverShotTimestampNanos = Math.max(
                     oldestAllowedTimestamp,
