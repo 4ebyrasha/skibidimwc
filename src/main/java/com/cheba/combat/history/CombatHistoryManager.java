@@ -49,12 +49,10 @@ public final class CombatHistoryManager {
 
         UUID playerId = player.getUniqueID();
 
-        PlayerHistory history = HISTORIES.computeIfAbsent(
-                playerId,
-                id -> new PlayerHistory()
-        );
-
-        PlayerSnapshot previousSnapshot = history.getLatest();
+        /*
+         * Validate and capture the snapshot before creating a history.
+         * Invalid player state must not leave an empty history in the map.
+         */
         PlayerSnapshot snapshot;
 
         try {
@@ -70,6 +68,13 @@ public final class CombatHistoryManager {
             );
             return;
         }
+
+        PlayerHistory history = HISTORIES.computeIfAbsent(
+                playerId,
+                id -> new PlayerHistory()
+        );
+
+        PlayerSnapshot previousSnapshot = history.getLatest();
 
         long intervalNanos = previousSnapshot == null
                 ? -1L
