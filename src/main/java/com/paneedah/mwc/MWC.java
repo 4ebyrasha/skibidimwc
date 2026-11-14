@@ -1,7 +1,10 @@
 package com.paneedah.mwc;
 
 import com.cheba.Run;
+import com.cheba.combat.fire.ServerFireRateLimiter;
 import com.cheba.combat.handlers.CombatHistoryEventHandler;
+import com.cheba.combat.history.CombatHistoryManager;
+import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.effect.BulletSuppressionEffect;
 import com.cheba.m.GuiHandler;
 import com.paneedah.mwc.creativetab.*;
@@ -28,10 +31,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
+import net.minecraftforge.fml.common.event.*;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.FMLLaunchHandler;
@@ -324,6 +324,18 @@ public final class MWC {
         serverStartingEvent.registerServerCommand(new BalancePackCommand());
         serverStartingEvent.registerServerCommand(new CraftingFileCommand());
         BalancePackManager.loadDirectory();
+    }
+
+    /**
+     * Clears combat system state after the server has completely stopped.
+     *
+     * @param event server stopped lifecycle event
+     */
+    @Mod.EventHandler
+    public void onServerStopped(FMLServerStoppedEvent event) {
+        CombatHistoryManager.clear();
+        CombatClockSyncManager.clear();
+        ServerFireRateLimiter.clear();
     }
 
     public static void updateDebugHandler() {

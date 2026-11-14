@@ -91,19 +91,4 @@ public final class CombatHistoryEventHandler {
         );
     }
 
-    /**
-     * Clears all combat state when the server stops.
-     */
-    @SubscribeEvent
-    public static void onServerStopped(FMLServerStoppedEvent event) {
-        CombatHistoryManager.clear();
-        CombatClockSyncManager.clear();
-        ServerFireRateLimiter.clear();
-
-        CombatLog.info(
-                "CombatHistoryEventHandler",
-                "onServerStopped",
-                "Combat history, clock synchronization and fire-rate state cleared"
-        );
-    }
 }
