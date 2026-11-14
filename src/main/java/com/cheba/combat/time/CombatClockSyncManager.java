@@ -4,7 +4,6 @@ import com.cheba.combat.logging.CombatLog;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -197,7 +196,8 @@ public final class CombatClockSyncManager {
             }
 
             long rtt = clientElapsed - serverProcessing;
-            if (rtt < 0L || rtt > MAX_CLIENT_RTT_NANOS) {
+
+            if (rtt < 0L) {
                 CombatLog.warn(
                         "CombatClockSyncManager",
                         "acceptReport",
@@ -378,7 +378,7 @@ public final class CombatClockSyncManager {
     private static void updateEstimate(PlayerClockState state) {
         List<ClockSample> sorted = new ArrayList<>(state.samples);
 
-        Collections.sort(sorted, Comparator.comparingLong(sample -> sample.rttNanos));
+        sorted.sort(Comparator.comparingLong(sample -> sample.rttNanos));
 
         int selectedCount = Math.min(BEST_SAMPLE_COUNT, sorted.size());
         List<Long> offsets = new ArrayList<>(selectedCount);
@@ -390,7 +390,7 @@ public final class CombatClockSyncManager {
             bestRtt = Math.min(bestRtt, sample.rttNanos);
         }
 
-        Collections.sort(offsets);
+        offsets.sort(Long::compareTo);
 
         long medianOffset;
         if ((offsets.size() & 1) == 1) {
