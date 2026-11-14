@@ -13,6 +13,7 @@
 !/gradlew.bat
 !/gradle/
 !/test_logs/
+!/test_logs/**
 
 # Allow Gradle wrapper
 !/gradle/wrapper/
