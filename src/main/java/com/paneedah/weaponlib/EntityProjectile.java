@@ -1,5 +1,6 @@
 package com.paneedah.weaponlib;
 
+import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.BlockHitMessage;
 import com.paneedah.mwc.utils.MWCUtil;
 import com.paneedah.mwc.utils.VectorUtil;
@@ -412,7 +413,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             }
         }
 
-        long shotTimestampNanos = -1L;
+        long shotTimestampNanos =
+                CombatClockSyncManager.NO_ESTIMATE;
 
         if (this instanceof WeaponSpawnEntity && !world.isRemote) {
             shotTimestampNanos =
@@ -457,7 +459,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
              * has a valid state at the projectile segment midpoint.
              */
             if (target instanceof EntityPlayerMP
-                    && shotTimestampNanos > 0L) {
+                    && shotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE) {
 
                 EntityPlayerMP player = (EntityPlayerMP) target;
 
@@ -594,7 +596,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         if (player == null
                 || start == null
                 || end == null
-                || segmentStartNanos <= 0L
                 || segmentEndNanos <= segmentStartNanos
                 || segmentLengthSquared <= 1.0E-12D) {
             return null;

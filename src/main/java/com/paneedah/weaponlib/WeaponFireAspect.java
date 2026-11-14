@@ -1,5 +1,6 @@
 package com.paneedah.weaponlib;
 
+import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
 import com.paneedah.mwc.instancing.Tags;
 import com.paneedah.mwc.network.NetworkPermitManager;
@@ -631,7 +632,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 clientShotTimestampNanos,
                 player.rotationYaw,
                 player.rotationPitch,
-                -1L
+                CombatClockSyncManager.NO_ESTIMATE
         );
     }
 
@@ -646,7 +647,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 clientShotTimestampNanos,
                 shotYaw,
                 shotPitch,
-                -1L
+                CombatClockSyncManager.NO_ESTIMATE
         );
     }
 
@@ -699,7 +700,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 clientShotTimestampNanos,
                 player.rotationYaw,
                 player.rotationPitch,
-                -1L
+                CombatClockSyncManager.NO_ESTIMATE
         );
     }
 
@@ -714,7 +715,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 clientShotTimestampNanos,
                 shotYaw,
                 shotPitch,
-                -1L
+                CombatClockSyncManager.NO_ESTIMATE
         );
     }
 
@@ -799,9 +800,10 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
          * Empty-ammo requests must not consume the cooldown.
          */
         if (player instanceof EntityPlayerMP) {
-            long rateLimitTimestamp = serverShotTimestampNanos > 0L
-                    ? Math.min(serverShotTimestampNanos, serverReceiveTimestampNanos)
-                    : serverReceiveTimestampNanos;
+            long rateLimitTimestamp =
+                    serverShotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE
+                            ? Math.min(serverShotTimestampNanos, serverReceiveTimestampNanos)
+                            : serverReceiveTimestampNanos;
 
             if (!com.cheba.combat.fire.ServerFireRateLimiter.tryAccept(
                     (EntityPlayerMP) player,
@@ -842,7 +844,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     shooterId,
                     formatTimingInterval(clientInterval),
                     formatTimingInterval(serverReceiveInterval),
-                    serverShotTimestampNanos > 0L
+                    serverShotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE
                             ? formatTimingInterval(
                             serverReceiveTimestampNanos
                                     - serverShotTimestampNanos
@@ -909,11 +911,12 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
          * - Current origin fallback: timestamp captured with current origin.
          * - Non-player shooters or unavailable shot timestamp: disabled.
          */
-        long projectileTimelineTimestampNanos = -1L;
+        long projectileTimelineTimestampNanos =
+                CombatClockSyncManager.NO_ESTIMATE;
 
         boolean historicalTimelineEligible =
                 player instanceof EntityPlayerMP
-                        && serverShotTimestampNanos > 0L;
+                        && serverShotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE;
 
         if (historicalTimelineEligible) {
             EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
