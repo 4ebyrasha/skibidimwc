@@ -422,6 +422,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     ((WeaponSpawnEntity) this).getServerShotTimestampNanos();
         }
 
+        final long projectileTickNanos = 50_000_000L;
+
         RayTraceResult nearestHit = null;
         double nearestDistanceSquared = Double.MAX_VALUE;
 
@@ -456,8 +458,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             }
 
             /*
-             * Historical collision is available only when the target
-             * has a valid state at the projectile segment midpoint.
+             * Historical collision is available only for server players
+             * and projectiles with a valid server-side timeline.
              */
             if (target instanceof EntityPlayerMP
                     && shotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE) {
@@ -467,14 +469,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 long segmentStartNanos =
                         shotTimestampNanos
                                 + Math.max(0L, ticksExisted - 1L)
-                                * 50_000_000L;
-
-                long segmentEndNanos =
-                        segmentStartNanos + 50_000_000L;
-
-                long midpointNanos =
-                        segmentStartNanos
-                                + (segmentEndNanos - segmentStartNanos) / 2L;
+                                * projectileTickNanos;
 
                 /*
                  * Capture one temporary endpoint for all historical queries
@@ -498,82 +493,158 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     );
                 }
 
-                HistoricalPlayerState midpointState =
-                        liveEndpoint != null
-                                ? CombatHistoryManager.getHistoricalState(
-                                player.getUniqueID(),
-                                midpointNanos,
-                                liveEndpoint
-                        )
-                                : CombatHistoryManager.getHistoricalState(
-                                player.getUniqueID(),
-                                midpointNanos
+                /*
+                 * A projectile must not be tested against a future portion
+                 * of its nominal 50 ms segment.
+                 *
+                 * The first world tick after firing may happen less than
+                 * 50 ms after the shot. In that case, only the elapsed part
+                 * of the projectile segment is eligible for historical hits.
+                 */
+                if (liveEndpoint != null) {
+                    long endpointTimestampNanos =
+                            liveEndpoint.getTimestampNanos();
+
+                    long elapsedNanos =
+                            endpointTimestampNanos - segmentStartNanos;
+
+                    if (elapsedNanos <= 0L) {
+                        CombatLog.trace(
+                                "EntityProjectile",
+                                "getRayTraceEntities",
+                                "Historical segment skipped: no elapsed time"
+                                        + " | Projectile=" + getEntityId()
+                                        + " | Target=" + player.getUniqueID()
+                                        + " | SegmentStart=" + segmentStartNanos
+                                        + " | LiveEndpoint=" + endpointTimestampNanos
                         );
 
-                if (isValidHistoricalState(player, midpointState)) {
-
-                    RayTraceResult historicalHit =
-                            findHistoricalPlayerIntersection(
-                                    player,
-                                    start,
-                                    end,
-                                    segmentStartNanos,
-                                    segmentEndNanos,
-                                    segmentLengthSquared,
-                                    liveEndpoint
-                            );
-
-                    if (historicalHit != null) {
-                        double distanceSquared =
-                                start.squareDistanceTo(historicalHit.hitVec);
-
-                        if (distanceSquared < nearestDistanceSquared) {
-                            nearestDistanceSquared = distanceSquared;
-                            nearestHit = historicalHit;
-                        }
+                        continue;
                     }
 
-                    continue;
-                }
+                    long segmentDurationNanos =
+                            Math.min(projectileTickNanos, elapsedNanos);
 
-                String failureReason;
+                    long segmentEndNanos =
+                            segmentStartNanos + segmentDurationNanos;
 
-                if (midpointState == null) {
-                    failureReason =
-                            liveEndpoint != null
-                                    ? CombatHistoryManager.getHistoricalStateFailureReason(
+                    double segmentProgress =
+                            (double) segmentDurationNanos
+                                    / (double) projectileTickNanos;
+
+                    Vec3d historicalEnd =
+                            start.add(segment.scale(segmentProgress));
+
+                    Vec3d historicalSegment =
+                            historicalEnd.subtract(start);
+
+                    double historicalSegmentLengthSquared =
+                            historicalSegment.lengthSquared();
+
+                    if (historicalSegmentLengthSquared <= 1.0E-12D) {
+                        continue;
+                    }
+
+                    long midpointNanos =
+                            segmentStartNanos
+                                    + segmentDurationNanos / 2L;
+
+                    if (segmentDurationNanos < projectileTickNanos) {
+                        CombatLog.trace(
+                                "EntityProjectile",
+                                "getRayTraceEntities",
+                                "Historical segment clipped to live endpoint"
+                                        + " | Projectile=" + getEntityId()
+                                        + " | Target=" + player.getUniqueID()
+                                        + " | OriginalDurationMs="
+                                        + projectileTickNanos / 1_000_000.0D
+                                        + " | ActualDurationMs="
+                                        + segmentDurationNanos / 1_000_000.0D
+                                        + " | SegmentStart=" + segmentStartNanos
+                                        + " | SegmentEnd=" + segmentEndNanos
+                        );
+                    }
+
+                    HistoricalPlayerState midpointState =
+                            CombatHistoryManager.getHistoricalState(
                                     player.getUniqueID(),
                                     midpointNanos,
                                     liveEndpoint
-                            )
-                                    : CombatHistoryManager.getHistoricalStateFailureReason(
-                                    player.getUniqueID(),
-                                    midpointNanos
                             );
-                } else if (midpointState.getEntityId() != player.getEntityId()) {
-                    failureReason = "ENTITY_ID_MISMATCH";
-                } else {
-                    failureReason = "DIMENSION_MISMATCH";
-                }
 
-                CombatLog.trace(
-                        "EntityProjectile",
-                        "getRayTraceEntities",
-                        "Historical target state unavailable"
-                                + " | Projectile=" + getEntityId()
-                                + " | Shooter="
-                                + (shooter == null
-                                ? "null"
-                                : shooter.getUniqueID())
-                                + " | Target=" + player.getUniqueID()
-                                + " | TargetEntityId=" + player.getEntityId()
-                                + " | TargetDimension=" + player.dimension
-                                + " | SegmentStart=" + segmentStartNanos
-                                + " | SegmentEnd=" + segmentEndNanos
-                                + " | Midpoint=" + midpointNanos
-                                + " | Reason=" + failureReason
-                                + " | Fallback=CurrentAABB"
-                );
+                    if (isValidHistoricalState(player, midpointState)) {
+                        RayTraceResult historicalHit =
+                                findHistoricalPlayerIntersection(
+                                        player,
+                                        start,
+                                        historicalEnd,
+                                        segmentStartNanos,
+                                        segmentEndNanos,
+                                        historicalSegmentLengthSquared,
+                                        liveEndpoint
+                                );
+
+                        if (historicalHit != null) {
+                            double distanceSquared =
+                                    start.squareDistanceTo(historicalHit.hitVec);
+
+                            if (distanceSquared < nearestDistanceSquared) {
+                                nearestDistanceSquared = distanceSquared;
+                                nearestHit = historicalHit;
+                            }
+                        }
+
+                        /*
+                         * A valid historical state was checked. A miss must
+                         * not fall through to the current AABB, because that
+                         * could register a hit at the wrong point in time.
+                         */
+                        continue;
+                    }
+
+                    String failureReason;
+
+                    if (midpointState == null) {
+                        failureReason =
+                                CombatHistoryManager.getHistoricalStateFailureReason(
+                                        player.getUniqueID(),
+                                        midpointNanos,
+                                        liveEndpoint
+                                );
+                    } else if (midpointState.getEntityId() != player.getEntityId()) {
+                        failureReason = "ENTITY_ID_MISMATCH";
+                    } else {
+                        failureReason = "DIMENSION_MISMATCH";
+                    }
+
+                    CombatLog.trace(
+                            "EntityProjectile",
+                            "getRayTraceEntities",
+                            "Historical target state unavailable"
+                                    + " | Projectile=" + getEntityId()
+                                    + " | Shooter="
+                                    + (shooter == null
+                                    ? "null"
+                                    : shooter.getUniqueID())
+                                    + " | Target=" + player.getUniqueID()
+                                    + " | TargetEntityId=" + player.getEntityId()
+                                    + " | TargetDimension=" + player.dimension
+                                    + " | SegmentStart=" + segmentStartNanos
+                                    + " | SegmentEnd=" + segmentEndNanos
+                                    + " | Midpoint=" + midpointNanos
+                                    + " | Reason=" + failureReason
+                                    + " | Fallback=CurrentAABB"
+                    );
+                } else {
+                    CombatLog.trace(
+                            "EntityProjectile",
+                            "getRayTraceEntities",
+                            "Historical target snapshot unavailable"
+                                    + " | Projectile=" + getEntityId()
+                                    + " | Target=" + player.getUniqueID()
+                                    + " | Fallback=CurrentAABB"
+                    );
+                }
             }
 
             /*
@@ -603,6 +674,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
         return nearestHit;
     }
+
 
     /**
      * Finds an intersection between a projectile segment and a player
