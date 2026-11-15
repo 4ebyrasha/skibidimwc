@@ -1,5 +1,6 @@
 package com.paneedah.weaponlib;
 
+import com.cheba.combat.history.PlayerSnapshot;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.BlockHitMessage;
 import com.paneedah.mwc.utils.MWCUtil;
@@ -475,8 +476,36 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                         segmentStartNanos
                                 + (segmentEndNanos - segmentStartNanos) / 2L;
 
+                /*
+                 * Capture one temporary endpoint for all historical queries
+                 * concerning this target during this projectile segment.
+                 */
+                PlayerSnapshot liveEndpoint = null;
+
+                try {
+                    liveEndpoint = new PlayerSnapshot(
+                            player,
+                            System.nanoTime()
+                    );
+                } catch (IllegalArgumentException exception) {
+                    CombatLog.warn(
+                            "EntityProjectile",
+                            "getRayTraceEntities",
+                            "Live target snapshot rejected"
+                                    + " | Projectile=" + getEntityId()
+                                    + " | Target=" + player.getUniqueID()
+                                    + " | Reason=" + exception.getMessage()
+                    );
+                }
+
                 HistoricalPlayerState midpointState =
-                        CombatHistoryManager.getHistoricalState(
+                        liveEndpoint != null
+                                ? CombatHistoryManager.getHistoricalState(
+                                player.getUniqueID(),
+                                midpointNanos,
+                                liveEndpoint
+                        )
+                                : CombatHistoryManager.getHistoricalState(
                                 player.getUniqueID(),
                                 midpointNanos
                         );
@@ -490,7 +519,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                                     end,
                                     segmentStartNanos,
                                     segmentEndNanos,
-                                    segmentLengthSquared
+                                    segmentLengthSquared,
+                                    liveEndpoint
                             );
 
                     if (historicalHit != null) {
@@ -510,7 +540,13 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
                 if (midpointState == null) {
                     failureReason =
-                            CombatHistoryManager.getHistoricalStateFailureReason(
+                            liveEndpoint != null
+                                    ? CombatHistoryManager.getHistoricalStateFailureReason(
+                                    player.getUniqueID(),
+                                    midpointNanos,
+                                    liveEndpoint
+                            )
+                                    : CombatHistoryManager.getHistoricalStateFailureReason(
                                     player.getUniqueID(),
                                     midpointNanos
                             );
@@ -575,7 +611,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      * <p>The player's movement is converted into relative projectile
      * movement. If one of the segment boundary snapshots is unavailable,
      * the midpoint snapshot is used as a static fallback. No extrapolation
-     * beyond the retained history is performed.</p>
+     * beyond the current authoritative state is performed.</p>
      *
      * @param player target player
      * @param start projectile segment start
@@ -583,6 +619,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      * @param segmentStartNanos segment start timestamp
      * @param segmentEndNanos segment end timestamp
      * @param segmentLengthSquared squared projectile segment length
+     * @param liveEndpoint temporary current authoritative snapshot
      * @return historical entity hit, or null when there is no valid hit
      */
     private RayTraceResult findHistoricalPlayerIntersection(
@@ -591,7 +628,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             Vec3d end,
             long segmentStartNanos,
             long segmentEndNanos,
-            double segmentLengthSquared
+            double segmentLengthSquared,
+            PlayerSnapshot liveEndpoint
     ) {
         if (player == null
                 || start == null
@@ -605,7 +643,13 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 + (segmentEndNanos - segmentStartNanos) / 2L;
 
         HistoricalPlayerState midpointState =
-                CombatHistoryManager.getHistoricalState(
+                liveEndpoint != null
+                        ? CombatHistoryManager.getHistoricalState(
+                        player.getUniqueID(),
+                        midpointNanos,
+                        liveEndpoint
+                )
+                        : CombatHistoryManager.getHistoricalState(
                         player.getUniqueID(),
                         midpointNanos
                 );
@@ -615,13 +659,25 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         HistoricalPlayerState startState =
-                CombatHistoryManager.getHistoricalState(
+                liveEndpoint != null
+                        ? CombatHistoryManager.getHistoricalState(
+                        player.getUniqueID(),
+                        segmentStartNanos,
+                        liveEndpoint
+                )
+                        : CombatHistoryManager.getHistoricalState(
                         player.getUniqueID(),
                         segmentStartNanos
                 );
 
         HistoricalPlayerState endState =
-                CombatHistoryManager.getHistoricalState(
+                liveEndpoint != null
+                        ? CombatHistoryManager.getHistoricalState(
+                        player.getUniqueID(),
+                        segmentEndNanos,
+                        liveEndpoint
+                )
+                        : CombatHistoryManager.getHistoricalState(
                         player.getUniqueID(),
                         segmentEndNanos
                 );
@@ -633,7 +689,13 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     isValidHistoricalState(player, startState)
                             ? "AVAILABLE"
                             : startState == null
+                            ? liveEndpoint != null
                             ? CombatHistoryManager.getHistoricalStateFailureReason(
+                            player.getUniqueID(),
+                            segmentStartNanos,
+                            liveEndpoint
+                    )
+                            : CombatHistoryManager.getHistoricalStateFailureReason(
                             player.getUniqueID(),
                             segmentStartNanos
                     )
@@ -643,7 +705,13 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     isValidHistoricalState(player, endState)
                             ? "AVAILABLE"
                             : endState == null
+                            ? liveEndpoint != null
                             ? CombatHistoryManager.getHistoricalStateFailureReason(
+                            player.getUniqueID(),
+                            segmentEndNanos,
+                            liveEndpoint
+                    )
+                            : CombatHistoryManager.getHistoricalStateFailureReason(
                             player.getUniqueID(),
                             segmentEndNanos
                     )

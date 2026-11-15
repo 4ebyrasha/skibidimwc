@@ -72,6 +72,25 @@ public final class PlayerHistory {
      * @return historical state, or null when unavailable
      */
     public HistoricalPlayerState getStateAt(long timestampNanos) {
+        return getStateAt(timestampNanos, null);
+    }
+
+    /**
+     * Resolves a player's state using an optional current authoritative
+     * snapshot as a temporary interpolation endpoint.
+     *
+     * <p>The live endpoint is never added to persistent history. It is only
+     * used when the requested timestamp is newer than the latest retained
+     * snapshot and does not exceed the endpoint timestamp.</p>
+     *
+     * @param timestampNanos requested server timestamp
+     * @param liveEndpoint current authoritative player snapshot
+     * @return historical state, or null when unavailable
+     */
+    public HistoricalPlayerState getStateAt(
+            long timestampNanos,
+            PlayerSnapshot liveEndpoint
+    ) {
         if (snapshots.isEmpty()) {
             return null;
         }
@@ -96,8 +115,32 @@ public final class PlayerHistory {
             previous = current;
         }
 
-        // Extrapolation beyond the newest snapshot is intentionally forbidden.
-        return null;
+        // Never resolve a timestamp beyond the current authoritative state.
+        if (liveEndpoint == null || previous == null
+                || timestampNanos > liveEndpoint.getTimestampNanos()) {
+            return null;
+        }
+
+        if (!previous.getPlayerId().equals(liveEndpoint.getPlayerId())
+                || previous.getEntityId() != liveEndpoint.getEntityId()
+                || previous.getDimension() != liveEndpoint.getDimension()) {
+            return null;
+        }
+
+        long endpointGap =
+                liveEndpoint.getTimestampNanos()
+                        - previous.getTimestampNanos();
+
+        if (endpointGap <= 0L
+                || endpointGap > MAX_INTERPOLATION_GAP_NANOS) {
+            return null;
+        }
+
+        if (timestampNanos == liveEndpoint.getTimestampNanos()) {
+            return fromSnapshot(liveEndpoint, timestampNanos);
+        }
+
+        return interpolate(previous, liveEndpoint, timestampNanos);
     }
 
     private HistoricalPlayerState fromSnapshot(
@@ -280,6 +323,60 @@ public final class PlayerHistory {
         }
 
         return "AFTER_NEWEST_SNAPSHOT";
+    }
+
+    /**
+     * Explains why a historical timestamp cannot be resolved when a
+     * temporary live endpoint is available.
+     *
+     * @param timestampNanos requested server timestamp
+     * @param liveEndpoint current authoritative player snapshot
+     * @return diagnostic reason code
+     */
+    public String getStateAtFailureReason(
+            long timestampNanos,
+            PlayerSnapshot liveEndpoint
+    ) {
+        String historyReason = getStateAtFailureReason(timestampNanos);
+
+        if (!"AFTER_NEWEST_SNAPSHOT".equals(historyReason)) {
+            return historyReason;
+        }
+
+        PlayerSnapshot newest = snapshots.peekLast();
+
+        if (newest == null) {
+            return "NO_PLAYER_HISTORY";
+        }
+
+        if (liveEndpoint == null) {
+            return "AFTER_NEWEST_SNAPSHOT";
+        }
+
+        if (newest.getPlayerId() == null
+                || liveEndpoint.getPlayerId() == null
+                || !newest.getPlayerId().equals(liveEndpoint.getPlayerId())
+                || newest.getEntityId() != liveEndpoint.getEntityId()) {
+            return "LIVE_ENDPOINT_IDENTITY_MISMATCH";
+        }
+
+        if (newest.getDimension() != liveEndpoint.getDimension()) {
+            return "LIVE_ENDPOINT_DIMENSION_MISMATCH";
+        }
+
+        long endpointTimestamp = liveEndpoint.getTimestampNanos();
+
+        if (timestampNanos > endpointTimestamp) {
+            return "AFTER_LIVE_ENDPOINT";
+        }
+
+        long gap = endpointTimestamp - newest.getTimestampNanos();
+
+        if (gap <= 0L || gap > MAX_INTERPOLATION_GAP_NANOS) {
+            return "LIVE_ENDPOINT_GAP_TOO_LARGE";
+        }
+
+        return "LIVE_ENDPOINT_INTERPOLATION_UNAVAILABLE";
     }
 
     public PlayerSnapshot getLatest() {

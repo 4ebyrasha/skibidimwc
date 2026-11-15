@@ -183,6 +183,36 @@ public final class CombatHistoryManager {
     }
 
     /**
+     * Returns the reason why a historical state is unavailable when a
+     * temporary live endpoint is available.
+     *
+     * @param playerId target player UUID
+     * @param timestampNanos requested server timestamp
+     * @param liveEndpoint current authoritative player snapshot
+     * @return diagnostic reason code
+     */
+    public static String getHistoricalStateFailureReason(
+            UUID playerId,
+            long timestampNanos,
+            PlayerSnapshot liveEndpoint
+    ) {
+        if (playerId == null) {
+            return "INVALID_PLAYER_ID";
+        }
+
+        PlayerHistory history = HISTORIES.get(playerId);
+
+        if (history == null) {
+            return "NO_PLAYER_HISTORY";
+        }
+
+        return history.getStateAtFailureReason(
+                timestampNanos,
+                liveEndpoint
+        );
+    }
+
+    /**
      * Returns the reason why a historical state is unavailable.
      *
      * @param playerId target player UUID
@@ -204,6 +234,34 @@ public final class CombatHistoryManager {
         }
 
         return history.getStateAtFailureReason(timestampNanos);
+    }
+
+    /**
+     * Resolves a player's historical state using a temporary current
+     * authoritative snapshot as an interpolation endpoint.
+     *
+     * @param playerId UUID of the target player
+     * @param timestampNanos requested timestamp in the server time domain
+     * @param liveEndpoint current authoritative player snapshot
+     * @return historical state, or null if unavailable
+     */
+    public static HistoricalPlayerState getHistoricalState(
+            UUID playerId,
+            long timestampNanos,
+            PlayerSnapshot liveEndpoint
+    ) {
+        if (playerId == null || liveEndpoint == null
+                || !playerId.equals(liveEndpoint.getPlayerId())) {
+            return null;
+        }
+
+        PlayerHistory history = HISTORIES.get(playerId);
+
+        if (history == null) {
+            return null;
+        }
+
+        return history.getStateAt(timestampNanos, liveEndpoint);
     }
 
     /**
