@@ -1,6 +1,8 @@
 package com.cheba.knockback;
 
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
+import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
@@ -12,8 +14,20 @@ import net.minecraftforge.common.capabilities.CapabilityManager;
 import net.minecraftforge.common.capabilities.ICapabilitySerializable;
 
 import javax.annotation.Nonnull;
+import java.util.UUID;
 
 public class KnockbackCapability implements ICapabilitySerializable<NBTBase> {
+
+    private static final UUID IMMUNITY_MODIFIER_ID =
+            UUID.fromString("9d7a8c2e-5f31-4b6a-8e20-1c3d5a7b9f11");
+
+    private static final AttributeModifier IMMUNITY_MODIFIER =
+            new AttributeModifier(
+                    IMMUNITY_MODIFIER_ID,
+                    "MWC knockback immunity",
+                    1.0D,
+                    0
+            );
 
     public interface State {
 
@@ -99,6 +113,28 @@ public class KnockbackCapability implements ICapabilitySerializable<NBTBase> {
         return player.getCapability(CAPABILITY, null);
     }
 
+    /**
+     * Changes knockback immunity and immediately applies it on the server.
+     */
+    public static void setImmune(EntityPlayer player, boolean immune) {
+        if (player == null || player.world.isRemote) {
+            return;
+        }
+
+        State state = get(player);
+
+        if (state == null) {
+            return;
+        }
+
+        state.setImmune(immune);
+        apply(player);
+    }
+
+    /**
+     * Applies only this capability's modifier.
+     * Other mods' base values and modifiers remain untouched.
+     */
     public static void apply(EntityPlayer player) {
         if (player == null || player.world.isRemote) {
             return;
@@ -110,9 +146,21 @@ public class KnockbackCapability implements ICapabilitySerializable<NBTBase> {
             return;
         }
 
-        player.getEntityAttribute(
+        IAttributeInstance attribute = player.getEntityAttribute(
                 SharedMonsterAttributes.KNOCKBACK_RESISTANCE
-        ).setBaseValue(state.isImmune() ? 1.0D : 0.0D);
+        );
+
+        if (attribute == null) {
+            return;
+        }
+
+        if (attribute.getModifier(IMMUNITY_MODIFIER_ID) != null) {
+            attribute.removeModifier(IMMUNITY_MODIFIER_ID);
+        }
+
+        if (state.isImmune()) {
+            attribute.applyModifier(IMMUNITY_MODIFIER);
+        }
     }
 
     public static void copy(EntityPlayer original, EntityPlayer replacement) {

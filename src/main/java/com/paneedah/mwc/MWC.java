@@ -94,6 +94,7 @@ public final class MWC {
 
         KnockbackCapability.register();
         MinecraftForge.EVENT_BUS.register(KnockbackCapabilityHandler.class);
+        FMLCommonHandler.instance().bus().register(KnockbackCapabilityHandler.class);
 
         commonProxy.preInit(this);
     }
