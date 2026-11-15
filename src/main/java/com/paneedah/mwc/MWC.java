@@ -86,6 +86,7 @@ public final class MWC {
     public void preInit(FMLPreInitializationEvent preInitializationEvent) {
         if (preInitializationEvent.getSide().isClient()) {
             MinecraftForge.EVENT_BUS.register(ClientEventHandler.class);
+            FMLCommonHandler.instance().bus().register(ClientEventHandler.class);
             MinecraftForge.EVENT_BUS.register(new GuiHandler());
             MinecraftForge.EVENT_BUS.register(new Run());
             MinecraftForge.EVENT_BUS.register(new BulletSuppressionEffect());
