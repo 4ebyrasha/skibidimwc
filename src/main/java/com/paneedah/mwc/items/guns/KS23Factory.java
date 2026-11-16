@@ -36,9 +36,23 @@ public class KS23Factory implements GunFactory {
                 .withInspectSound("inspection")
                 .withReloadIterationSound("load_shell")
                 .withAllReloadIterationsCompletedSound("ks23_pump_action")
+
+                // indoor
+                .withStereoCloseIndoorSound("ks23_close_ster")
+                .withCloseIndoorSound("ks23_close")
+                .withMediumIndoorSound("ks23_distant")
+                .withFarIndoorSound("ks23_distant")
+
+                // outdoor
+                .withStereoCloseOutdoorSound("ks23_close_ster")
+                .withCloseOutdoorSound("ks23_close")
+                .withMediumOutdoorSound("ks23_distant")
+                .withFarOutdoorSound("none")
+                .withVeryFarOutdoorSound("none")
+
                 .withReloadingTime(15)
                 .withShellCasingEjectEnabled(false)
-                .withInaccuracy(3)
+                .withInaccuracy(2)
                 .withPellets(12)
                 .withFlashIntensity(0.9f)
                 .withFlashScale(() -> 0.9f)
@@ -1392,7 +1406,7 @@ public class KS23Factory implements GunFactory {
                         )
 
                         .build())
-                .withSpawnEntityDamage(7.5f)
+                .withSpawnEntityDamage(12.5f)
                 .withSpawnEntityGravityVelocity(0.8f)
 
 

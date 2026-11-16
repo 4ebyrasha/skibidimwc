@@ -22,8 +22,8 @@ public class NGSWRFactory implements GunFactory {
 
                 .withName("ngsw_r")
                 //.withAmmoCapacity(30)
-                .withFireRate(0.75f)
-                .withRecoil(3f)
+                .withFireRate(0.74f)
+                .withRecoil(2.5f)
                 .withZoom(0.9f)
                 .withConfigGroup(GunConfigurationGroup.RIFLE)
                 .hasFlashPedals()
@@ -35,6 +35,20 @@ public class NGSWRFactory implements GunFactory {
                 .withEndOfShootSound("gun_click")
                 .withInspectSound("m4a1_inspection")
                 .withDrawSound("m4_draw")
+
+                // Outdoor
+                .withStereoCloseOutdoorSound("ngswr_outdoor_closester")
+                .withCloseOutdoorSound("ngswr_outdoor_close")
+                .withMediumOutdoorSound("ngswr_outdoor_distant")
+                .withFarOutdoorSound("none")
+                .withVeryFarOutdoorSound("none")
+
+                // Indoor
+                .withStereoCloseIndoorSound("ngswr_indoor_closester")
+                .withCloseIndoorSound("ngswr_indoor_close")
+                .withMediumIndoorSound("ngswr_indoor_distant")
+                .withFarIndoorSound("none")
+
                 .withReloadingTime(50)
                 .withFlashIntensity(0.5f)
                 .withFlashScale(() -> 0.6f)
@@ -816,7 +830,7 @@ public class NGSWRFactory implements GunFactory {
                                 }, 250, 0))
 
                         .build())
-                .withSpawnEntityDamage(7f)
+                .withSpawnEntityDamage(27f)
                 .withSpawnEntityGravityVelocity(0.0118f)
 
 

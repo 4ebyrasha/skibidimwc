@@ -2572,6 +2572,18 @@
       { "name": "${id}:ks23_close_ster", "stream": false }
     ]
   },
+  "ks23_close": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ks23_close", "stream": false }
+    ]
+  },
+  "ks23_indoor_distant": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ks23_indoor_distant", "stream": false }
+    ]
+  },
   "famas_outdoor_close": {
     "category": "master",
     "sounds": [
@@ -2668,6 +2680,84 @@
       { "name": "${id}:famas_stereo_indoor_silenced_close_06", "stream": false },
       { "name": "${id}:famas_stereo_indoor_silenced_close_07", "stream": false },
       { "name": "${id}:famas_stereo_indoor_silenced_close_08", "stream": false }
+    ]
+  },
+  "ngswr_indoor_closester": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ngswr_indoor_closester_01", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_02", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_03", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_04", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_05", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_06", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_07", "stream": false },
+      { "name": "${id}:ngswr_indoor_closester_08", "stream": false }
+    ]
+  },
+  "ngswr_indoor_close": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ngswr_indoor_close_01", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_02", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_03", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_04", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_05", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_06", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_07", "stream": false },
+      { "name": "${id}:ngswr_indoor_close_08", "stream": false }
+    ]
+  },
+  "ngswr_indoor_distant": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ngswr_indoor_distant_01", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_02", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_03", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_04", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_05", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_06", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_07", "stream": false },
+      { "name": "${id}:ngswr_indoor_distant_08", "stream": false }
+    ]
+  },
+  "ngswr_outdoor_closester": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ngswr_outdoor_closester_01", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_02", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_03", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_04", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_05", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_06", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_07", "stream": false },
+      { "name": "${id}:ngswr_outdoor_closester_08", "stream": false }
+    ]
+  },
+  "ngswr_outdoor_close": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ngswr_outdoor_close_01", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_02", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_03", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_04", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_05", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_06", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_07", "stream": false },
+      { "name": "${id}:ngswr_outdoor_close_08", "stream": false }
+    ]
+  },
+  "ngswr_outdoor_distant": {
+    "category": "master",
+    "sounds": [
+      { "name": "${id}:ngswr_outdoor_distant_01", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_02", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_03", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_04", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_05", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_06", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_07", "stream": false },
+      { "name": "${id}:ngswr_outdoor_distant_08", "stream": false }
     ]
   },
   "ssg_outdoor_close": {
