@@ -1,7 +1,6 @@
 package com.paneedah.weaponlib;
 
 import com.cheba.combat.client.ClientRenderedPlayerHistory;
-import com.cheba.combat.client.ClientTrackingSequenceManager;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
 import com.paneedah.mwc.instancing.Tags;
@@ -628,10 +627,23 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         for (ClientShotSnapshotCollector.ClientTargetSnapshots target
                 : ClientShotSnapshotCollector.collect(shooter, timestamp)) {
 
+            java.util.List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot>
+                    history = target.getSnapshots();
+
+            if (history.isEmpty()) {
+                continue;
+            }
+
+            long epoch = history.get(0).getEpoch();
+
             java.util.List<Snapshot> snapshots = new java.util.ArrayList<>();
 
             for (ClientRenderedPlayerHistory.RenderedPlayerSnapshot snapshot
-                    : target.getSnapshots()) {
+                    : history) {
+
+                if (snapshot.getEpoch() != epoch) {
+                    continue;
+                }
 
                 snapshots.add(new Snapshot(
                         snapshot.getSequence(),
@@ -640,22 +652,13 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 ));
             }
 
-            if (snapshots.isEmpty()) {
-                continue;
+            if (!snapshots.isEmpty()) {
+                result.add(new TargetSnapshots(
+                        target.getEntityId(),
+                        epoch,
+                        snapshots
+                ));
             }
-
-            ClientTrackingSequenceManager.TrackingSequence sequence =
-                    ClientTrackingSequenceManager.get(target.getEntityId());
-
-            if (sequence == null) {
-                continue;
-            }
-
-            result.add(new TargetSnapshots(
-                    target.getEntityId(),
-                    sequence.getEpoch(),
-                    snapshots
-            ));
         }
 
         return result;
