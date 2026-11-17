@@ -44,10 +44,9 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
     private static final int MAX_TICKS = 200;
 
-    private static final int DEFAULT_MAX_LIFETIME = 5000;
+    private static final long MAX_VIEWER_CORRECTION_NANOS = 200_000_000L;
 
-    private static final double PROJECTILE_SPAWN_FORWARD_OFFSET = 0.35D;
-    private static final double PROJECTILE_SPAWN_BLOCK_MARGIN = 0.01D;
+    private static final int DEFAULT_MAX_LIFETIME = 5000;
 
     private int xTile = -1;
     private int yTile = -1;
@@ -164,40 +163,10 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 Math.cos(yawRadians) * cosPitch
         );
 
-        Vec3d spawnPosition = eyePosition.add(
-                direction.scale(PROJECTILE_SPAWN_FORWARD_OFFSET)
-        );
-
-        /*
-         * Block collision is still checked against the current world.
-         * Historical block rollback is intentionally not part of this change.
-         */
-        RayTraceResult obstruction = world.rayTraceBlocks(
-                eyePosition,
-                spawnPosition,
-                false,
-                true,
-                false
-        );
-
-        if (obstruction != null
-                && obstruction.typeOfHit == RayTraceResult.Type.BLOCK) {
-
-            double safeDistance = Math.max(
-                    0.0D,
-                    eyePosition.distanceTo(obstruction.hitVec)
-                            - PROJECTILE_SPAWN_BLOCK_MARGIN
-            );
-
-            spawnPosition = eyePosition.add(
-                    direction.scale(safeDistance)
-            );
-        }
-
         setPositionAndRotation(
-                spawnPosition.x,
-                spawnPosition.y,
-                spawnPosition.z,
+                eyePosition.x,
+                eyePosition.y,
+                eyePosition.z,
                 shotYaw,
                 shotPitch
         );
@@ -462,9 +431,10 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             }
 
             /*
-             * Preserve the original shooter collision grace period.
+             * The shooter is never a valid projectile collision target.
+             * Projectiles spawn directly at the shooter's eye position.
              */
-            if (target == shooter && ticksInAir < 5) {
+            if (target == shooter) {
                 continue;
             }
 
@@ -688,9 +658,24 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
     private Vec3d getViewerOffset(
             EntityPlayerMP player,
-            PlayerSnapshot liveEndpoint
+            PlayerSnapshot liveEndpoint,
+            long segmentStartNanos
     ) {
         if (player == null || viewerSnapshots.isEmpty()) {
+            return Vec3d.ZERO;
+        }
+
+        if (!(this instanceof WeaponSpawnEntity)) {
+            return Vec3d.ZERO;
+        }
+
+        long shotTimestampNanos =
+                ((WeaponSpawnEntity) this).getServerShotTimestampNanos();
+
+        if (shotTimestampNanos == CombatClockSyncManager.NO_ESTIMATE
+                || segmentStartNanos < shotTimestampNanos
+                || segmentStartNanos - shotTimestampNanos
+                >= MAX_VIEWER_CORRECTION_NANOS) {
             return Vec3d.ZERO;
         }
 
@@ -815,11 +800,11 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             return null;
         }
 
-        /*
-         * Calculate the difference between the target position rendered
-         * to the shooter and the authoritative server position.
-         */
-        Vec3d viewerOffset = getViewerOffset(player, liveEndpoint);
+        Vec3d viewerOffset = getViewerOffset(
+                player,
+                liveEndpoint,
+                segmentStartNanos
+        );
 
         HistoricalPlayerState startState =
                 liveEndpoint != null
