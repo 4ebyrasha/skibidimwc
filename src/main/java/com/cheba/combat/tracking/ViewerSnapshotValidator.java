@@ -301,13 +301,22 @@ public final class ViewerSnapshotValidator {
         double toleranceSquared =
                 POSITION_TOLERANCE * POSITION_TOLERANCE;
 
-        ViewerTrackingManager.SentState current =
-                states.get(stateIndex);
-
         int firstIndex = Math.max(
                 0,
                 stateIndex - MAX_INTERPOLATION_STATES
         );
+
+        /*
+         * Ignore every movement segment before the latest teleport.
+         */
+        for (int i = firstIndex + 1; i <= stateIndex; i++) {
+            if (states.get(i).isTeleport()) {
+                firstIndex = i;
+            }
+        }
+
+        ViewerTrackingManager.SentState current =
+                states.get(stateIndex);
 
         if (stateIndex == firstIndex) {
             return distanceSquared(
@@ -324,23 +333,6 @@ public final class ViewerSnapshotValidator {
 
             ViewerTrackingManager.SentState next =
                     states.get(i);
-
-            /*
-             * Never interpolate between positions across a teleport.
-             * The exact post-teleport position remains valid.
-             */
-            if (next.isTeleport()) {
-                if (distanceSquared(
-                        x, y, z,
-                        next.getX(),
-                        next.getY(),
-                        next.getZ()
-                ) <= toleranceSquared) {
-                    return true;
-                }
-
-                continue;
-            }
 
             double dx = next.getX() - previous.getX();
             double dy = next.getY() - previous.getY();
