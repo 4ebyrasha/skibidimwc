@@ -32,6 +32,10 @@ import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cheba.combat.tracking.ViewerSnapshotValidator;
+
+import java.util.Collections;
+
 import static com.paneedah.mwc.MWC.CHANNEL;
 
 public abstract class EntityProjectile extends Entity implements IProjectile, IEntityAdditionalSpawnData {
@@ -61,6 +65,13 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
     protected float inaccuracy;
 
     private long timestamp;
+
+    /**
+     * Validated positions rendered to the shooter before this shot.
+     * Server-side only; never synchronized to tracking clients.
+     */
+    private List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots =
+            Collections.emptyList();
 
     private double aimTan;
 
@@ -979,6 +990,23 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
 
     public double getAimTan() {
         return aimTan;
+    }
+
+    public void setViewerSnapshots(
+            List<ViewerSnapshotValidator.ValidatedTarget> snapshots
+    ) {
+        if (world.isRemote || snapshots == null || snapshots.isEmpty()) {
+            viewerSnapshots = Collections.emptyList();
+            return;
+        }
+
+        viewerSnapshots = Collections.unmodifiableList(
+                new ArrayList<>(snapshots)
+        );
+    }
+
+    public List<ViewerSnapshotValidator.ValidatedTarget> getViewerSnapshots() {
+        return viewerSnapshots;
     }
 
     public EntityLivingBase getThrower() {

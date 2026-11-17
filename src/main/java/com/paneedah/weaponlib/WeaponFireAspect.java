@@ -1157,6 +1157,18 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     projectileTimelineTimestampNanos
             );
 
+            /*
+             * Viewer snapshots are valid only when the projectile uses
+             * the original historical shot timeline.
+             *
+             * A current-origin fallback must not consume old viewer snapshots.
+             */
+            bullet.setViewerSnapshots(
+                    historicalOriginAvailable
+                            ? viewerSnapshots
+                            : Collections.emptyList()
+            );
+
             bullet.setPositionAndDirectionFromShot(
                     isAimed,
                     shotYaw,
