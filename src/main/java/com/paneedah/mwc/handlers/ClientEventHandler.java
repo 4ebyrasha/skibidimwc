@@ -7,12 +7,19 @@ import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import com.cheba.combat.client.ClientRenderedPlayerHistory;
+import com.cheba.combat.client.ClientTrackingSequenceManager;
+import net.minecraft.client.entity.EntityOtherPlayerMP;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraftforge.client.event.RenderPlayerEvent;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -46,9 +53,10 @@ public class ClientEventHandler {
     }
 
     @SubscribeEvent
-    public static void onWorldUnloadEvent(WorldEvent.Unload worldUnloadEvent) {
+    public static void onWorldUnloadEvent(WorldEvent.Unload event) {
         ClientTickerController.stop();
         clockSyncTicks = CLOCK_SYNC_INTERVAL_TICKS;
+        ClientTrackingSequenceManager.clear();
     }
 
     /**
@@ -84,6 +92,106 @@ public class ClientEventHandler {
         MWC.CHANNEL.sendToServer(
                 new CombatTimeSyncRequest(nonce, clientSendNanos)
         );
+    }
+
+    @SubscribeEvent
+    public static void onRenderWorldLast(RenderWorldLastEvent event) {
+        if (MC.world == null || MC.player == null) {
+            return;
+        }
+
+        float partialTicks = event.getPartialTicks();
+        long nowNanos = System.nanoTime();
+
+        for (EntityPlayer player : MC.world.playerEntities) {
+            if (!(player instanceof EntityOtherPlayerMP)
+                    || player.isDead
+                    || player.isRiding()
+                    || player.world != MC.world) {
+                continue;
+            }
+
+            ClientTrackingSequenceManager.TrackingSequence sequence =
+                    ClientTrackingSequenceManager.get(player.getEntityId());
+
+            if (sequence == null) {
+                continue;
+            }
+
+            double renderX = player.lastTickPosX
+                    + (player.posX - player.lastTickPosX) * partialTicks;
+            double renderY = player.lastTickPosY
+                    + (player.posY - player.lastTickPosY) * partialTicks;
+            double renderZ = player.lastTickPosZ
+                    + (player.posZ - player.lastTickPosZ) * partialTicks;
+
+            AxisAlignedBB renderedBox = player.getEntityBoundingBox().offset(
+                    renderX - player.posX,
+                    renderY - player.posY,
+                    renderZ - player.posZ
+            );
+
+            ClientRenderedPlayerHistory.record(
+                    player.getEntityId(),
+                    sequence.getEpoch(),
+                    sequence.getSequence(),
+                    nowNanos,
+                    renderedBox
+            );
+        }
+
+        ClientRenderedPlayerHistory.pruneStale(nowNanos);
+    }
+
+    @SubscribeEvent
+    public static void onRenderPlayerPost(RenderPlayerEvent.Post event) {
+        if (MC.world == null || MC.player == null) {
+            return;
+        }
+
+        EntityPlayer player = event.getEntityPlayer();
+
+        if (!(player instanceof EntityOtherPlayerMP)
+                || player.isDead
+                || player.isRiding()
+                || player.world != MC.world) {
+            return;
+        }
+
+        long nowNanos = System.nanoTime();
+
+        ClientTrackingSequenceManager.TrackingSequence sequence =
+                ClientTrackingSequenceManager.get(player.getEntityId());
+
+        if (sequence == null) {
+            ClientRenderedPlayerHistory.pruneStale(nowNanos);
+            return;
+        }
+
+        float partialTicks = event.getPartialTicks();
+
+        double renderX = player.lastTickPosX
+                + (player.posX - player.lastTickPosX) * partialTicks;
+        double renderY = player.lastTickPosY
+                + (player.posY - player.lastTickPosY) * partialTicks;
+        double renderZ = player.lastTickPosZ
+                + (player.posZ - player.lastTickPosZ) * partialTicks;
+
+        AxisAlignedBB renderedBox = player.getEntityBoundingBox().offset(
+                renderX - player.posX,
+                renderY - player.posY,
+                renderZ - player.posZ
+        );
+
+        ClientRenderedPlayerHistory.record(
+                player.getEntityId(),
+                sequence.getEpoch(),
+                sequence.getSequence(),
+                nowNanos,
+                renderedBox
+        );
+
+        ClientRenderedPlayerHistory.pruneStale(nowNanos);
     }
 
     @SubscribeEvent
