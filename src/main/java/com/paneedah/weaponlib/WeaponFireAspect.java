@@ -1021,6 +1021,16 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 player.posZ
         );
 
+        /*
+         * Never use client-submitted rotation as the authoritative
+         * projectile direction.
+         *
+         * Start with the latest rotation accepted by the server.
+         * Historical shooter state below replaces it when available.
+         */
+        shotYaw = player.rotationYaw;
+        shotPitch = player.rotationPitch;
+
         boolean historicalOriginAvailable = false;
 
         /*
@@ -1177,17 +1187,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     shotPitch,
                     projectileOrigin
             );
-
-            /*
-             * Never use client-submitted rotation as the authoritative
-             * projectile direction.
-             *
-             * Start with the latest rotation accepted by the server.
-             * If historical shooter state is available, it replaces this
-             * direction with the rotation from the original shot timeline.
-             */
-            shotYaw = player.rotationYaw;
-            shotPitch = player.rotationPitch;
 
             /*
              * Register the projectile before simulating elapsed ticks.

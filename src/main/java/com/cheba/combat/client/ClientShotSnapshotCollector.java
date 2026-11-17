@@ -101,10 +101,29 @@ public final class ClientShotSnapshotCollector {
     selectSnapshots(
             List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot> source
     ) {
-        int count = source.size();
+        List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot> distinct =
+                new ArrayList<>(source.size());
+
+        /*
+         * Rendering can produce multiple snapshots for the same network
+         * sequence. Keep only the latest rendered position for each sequence.
+         */
+        for (ClientRenderedPlayerHistory.RenderedPlayerSnapshot snapshot : source) {
+            int lastIndex = distinct.size() - 1;
+
+            if (lastIndex >= 0
+                    && distinct.get(lastIndex).getSequence()
+                    == snapshot.getSequence()) {
+                distinct.set(lastIndex, snapshot);
+            } else {
+                distinct.add(snapshot);
+            }
+        }
+
+        int count = distinct.size();
 
         if (count <= MAX_SNAPSHOTS_PER_TARGET) {
-            return source;
+            return distinct;
         }
 
         List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot> result =
@@ -114,7 +133,7 @@ public final class ClientShotSnapshotCollector {
             int index = i * (count - 1)
                     / (MAX_SNAPSHOTS_PER_TARGET - 1);
 
-            result.add(source.get(index));
+            result.add(distinct.get(index));
         }
 
         return result;
