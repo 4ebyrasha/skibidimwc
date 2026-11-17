@@ -317,9 +317,9 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                         "Projectile impact"
                                 + " | Projectile=" + getUniqueID()
                                 + " | EntityId=" + getEntityId()
-                                + " | Shooter=" + (shooter == null
+                                + " | Shooter=" + (thrower == null
                                 ? "null"
-                                : shooter.getUniqueID())
+                                : thrower.getUniqueID())
                                 + " | HitX=" + movingobjectposition.hitVec.x
                                 + " | HitY=" + movingobjectposition.hitVec.y
                                 + " | HitZ=" + movingobjectposition.hitVec.z

@@ -1,5 +1,6 @@
 package com.paneedah.weaponlib;
 
+import com.cheba.combat.logging.CombatLog;
 import com.paneedah.mwc.ProjectConstants;
 import com.paneedah.mwc.network.messages.BloodClientMessage;
 import com.paneedah.mwc.network.messages.CrackSoundMessage;
@@ -360,8 +361,6 @@ public class WeaponSpawnEntity extends EntityProjectile {
             entityImpactPosition = position.hitVec;
 
         } else if (position.typeOfHit == RayTraceResult.Type.BLOCK) {
-            // без этой строки onUpdate() не сможет обработать финальный сегмент,
-            // и подавление у стены не сработает
             blockImpactPosition = position.hitVec;
 
             weapon.onSpawnEntityBlockImpact(world, null, this, position);
@@ -372,6 +371,19 @@ public class WeaponSpawnEntity extends EntityProjectile {
         }
 
         if (explosionRadius > 0) {
+            CombatLog.debug(
+                    "WeaponSpawnEntity",
+                    "onImpact",
+                    "Creating projectile explosion"
+                            + " | Projectile=" + getUniqueID()
+                            + " | Shooter=" + (getThrower() == null
+                            ? "null"
+                            : getThrower().getUniqueID())
+                            + " | Weapon=" + weapon.getName()
+                            + " | Radius=" + explosionRadius
+                            + " | Position=" + position.hitVec
+            );
+
             Explosion.createServerSideExplosion(
                     world,
                     this.getThrower(),
@@ -393,9 +405,31 @@ public class WeaponSpawnEntity extends EntityProjectile {
             );
 
         } else if (position.entityHit != null) {
-            position.entityHit.attackEntityFrom(
-                    new ProjectileDamageSource("gun", weapon.getName(), this, this.getThrower()),
+            boolean damageAccepted = position.entityHit.attackEntityFrom(
+                    new ProjectileDamageSource(
+                            "gun",
+                            weapon.getName(),
+                            this,
+                            this.getThrower()
+                    ),
                     damage
+            );
+
+            CombatLog.debug(
+                    "WeaponSpawnEntity",
+                    "onImpact",
+                    "Projectile damage processed"
+                            + " | Projectile=" + getUniqueID()
+                            + " | Shooter=" + (getThrower() == null
+                            ? "null"
+                            : getThrower().getUniqueID())
+                            + " | Target=" + position.entityHit.getUniqueID()
+                            + " | TargetEntityId=" + position.entityHit.getEntityId()
+                            + " | TargetClass=" + position.entityHit.getClass().getSimpleName()
+                            + " | Weapon=" + weapon.getName()
+                            + " | Damage=" + damage
+                            + " | Accepted=" + damageAccepted
+                            + " | HitPosition=" + position.hitVec
             );
 
             position.entityHit.hurtResistantTime = 0;
