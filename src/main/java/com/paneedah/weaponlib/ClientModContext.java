@@ -1,6 +1,8 @@
 package com.paneedah.weaponlib;
 
 import com.cheba.combat.logging.CombatLogCommand;
+import com.cheba.combat.replay.MWCReplayCommand;
+import com.cheba.combat.replay.MWCReplayController;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
 import com.paneedah.weaponlib.animation.player.screenshake.ScreenShakingAnimationManager;
 import com.paneedah.weaponlib.command.DebugCommand;
@@ -66,6 +68,14 @@ public class ClientModContext extends CommonModContext {
 
         ClientCommandHandler.instance.registerCommand(
                 new CombatLogCommand()
+        );
+
+        ClientCommandHandler.instance.registerCommand(
+                new MWCReplayCommand()
+        );
+
+        MinecraftForge.EVENT_BUS.register(
+                new MWCReplayController()
         );
 
         rendererRegistry = new CompatibleRenderingRegistry();
