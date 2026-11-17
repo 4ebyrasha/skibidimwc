@@ -1,5 +1,6 @@
 package com.paneedah.weaponlib;
 
+import com.cheba.combat.logging.CombatLogCommand;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
 import com.paneedah.weaponlib.animation.player.screenshake.ScreenShakingAnimationManager;
 import com.paneedah.weaponlib.command.DebugCommand;
@@ -62,6 +63,10 @@ public class ClientModContext extends CommonModContext {
         ClientCommandHandler.instance.registerCommand(new DebugCommand());
 
         ClientCommandHandler.instance.registerCommand(new MainCommand());
+
+        ClientCommandHandler.instance.registerCommand(
+                new CombatLogCommand()
+        );
 
         rendererRegistry = new CompatibleRenderingRegistry();
 

@@ -5,6 +5,7 @@ import com.cheba.combat.fire.ServerFireRateLimiter;
 import com.cheba.combat.handlers.CombatHistoryEventHandler;
 import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
+import com.cheba.combat.logging.CombatLogCommand;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.combat.tracking.message.TrackingMarkerMessage;
 import com.cheba.combat.tracking.message.TrackingMarkerMessageHandler;
@@ -95,6 +96,9 @@ public final class MWC {
             MinecraftForge.EVENT_BUS.register(new VectorMath());
         }
 
+        Runtime.getRuntime().addShutdownHook(
+                new Thread(CombatLog::close, "MWC-CombatLog-Shutdown")
+        );
         KnockbackCapability.register();
         MinecraftForge.EVENT_BUS.register(KnockbackCapabilityHandler.class);
         FMLCommonHandler.instance().bus().register(KnockbackCapabilityHandler.class);
@@ -105,7 +109,7 @@ public final class MWC {
     @Mod.EventHandler
     public void init(FMLInitializationEvent initializationEvent) {
 
-        CombatLog.setTraceEnabled(true);
+        //CombatLog.setTraceEnabled(true);
 
         MinecraftForge.EVENT_BUS.register(CommonEventHandler.class);
         MinecraftForge.EVENT_BUS.register(CombatHistoryEventHandler.class);
@@ -344,6 +348,9 @@ public final class MWC {
         serverStartingEvent.registerServerCommand(new BalancePackCommand());
         serverStartingEvent.registerServerCommand(new CraftingFileCommand());
         BalancePackManager.loadDirectory();
+        serverStartingEvent.registerServerCommand(
+                new CombatLogCommand()
+        );
     }
 
     /**
