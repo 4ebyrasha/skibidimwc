@@ -13,6 +13,12 @@ import java.util.List;
 
 public final class ViewerSnapshotValidator {
 
+    private static final long MAX_CLOCK_MAPPING_ERROR_NANOS =
+            50_000_000L;
+
+    private static final long MAX_RENDER_AFTER_SEND_NANOS =
+            200_000_000L;
+
     private static final long MAX_REWIND_NANOS = 200_000_000L;
 
     /*
@@ -153,6 +159,21 @@ public final class ViewerSnapshotValidator {
                     break;
                 }
 
+                ViewerTrackingManager.SentState sentState =
+                        states.get(stateIndex);
+
+                long mappedClientTimestamp =
+                        CombatClockSyncManager.getEstimatedServerTime(
+                                observer.getUniqueID(),
+                                clientTimestamp
+                        );
+
+                if (mappedClientTimestamp
+                        == CombatClockSyncManager.NO_ESTIMATE) {
+                    invalidSequence = true;
+                    break;
+                }
+
                 AxisAlignedBB box = snapshot.getBoundingBox();
 
                 if (!hasValidDimensions(
@@ -189,6 +210,32 @@ public final class ViewerSnapshotValidator {
                         serverTimestamp,
                         box
                 ));
+
+                long clockMappingError;
+                long renderAfterSend;
+
+                try {
+                    clockMappingError = Math.subtractExact(
+                            mappedClientTimestamp,
+                            serverTimestamp
+                    );
+
+                    renderAfterSend = Math.subtractExact(
+                            mappedClientTimestamp,
+                            sentState.getTimestampNanos()
+                    );
+                } catch (ArithmeticException exception) {
+                    invalidSequence = true;
+                    break;
+                }
+
+                if (clockMappingError < -MAX_CLOCK_MAPPING_ERROR_NANOS
+                        || clockMappingError > MAX_CLOCK_MAPPING_ERROR_NANOS
+                        || renderAfterSend < -MAX_CLOCK_MAPPING_ERROR_NANOS
+                        || renderAfterSend > MAX_RENDER_AFTER_SEND_NANOS) {
+                    invalidSequence = true;
+                    break;
+                }
 
                 previousClientTimestamp = clientTimestamp;
                 previousSequence = sequence;
@@ -251,13 +298,16 @@ public final class ViewerSnapshotValidator {
         double y = box.minY;
         double z = (box.minZ + box.maxZ) * 0.5D;
 
+        double toleranceSquared =
+                POSITION_TOLERANCE * POSITION_TOLERANCE;
+
+        ViewerTrackingManager.SentState current =
+                states.get(stateIndex);
+
         int firstIndex = Math.max(
                 0,
                 stateIndex - MAX_INTERPOLATION_STATES
         );
-
-        ViewerTrackingManager.SentState current =
-                states.get(stateIndex);
 
         if (stateIndex == firstIndex) {
             return distanceSquared(
@@ -265,7 +315,7 @@ public final class ViewerSnapshotValidator {
                     current.getX(),
                     current.getY(),
                     current.getZ()
-            ) <= POSITION_TOLERANCE * POSITION_TOLERANCE;
+            ) <= toleranceSquared;
         }
 
         for (int i = firstIndex + 1; i <= stateIndex; i++) {
@@ -274,6 +324,23 @@ public final class ViewerSnapshotValidator {
 
             ViewerTrackingManager.SentState next =
                     states.get(i);
+
+            /*
+             * Never interpolate between positions across a teleport.
+             * The exact post-teleport position remains valid.
+             */
+            if (next.isTeleport()) {
+                if (distanceSquared(
+                        x, y, z,
+                        next.getX(),
+                        next.getY(),
+                        next.getZ()
+                ) <= toleranceSquared) {
+                    return true;
+                }
+
+                continue;
+            }
 
             double dx = next.getX() - previous.getX();
             double dy = next.getY() - previous.getY();
@@ -285,16 +352,6 @@ public final class ViewerSnapshotValidator {
             if (lengthSquared
                     > MAX_INTERPOLATION_DISTANCE
                     * MAX_INTERPOLATION_DISTANCE) {
-
-                if (distanceSquared(
-                        x, y, z,
-                        next.getX(),
-                        next.getY(),
-                        next.getZ()
-                ) <= POSITION_TOLERANCE * POSITION_TOLERANCE) {
-                    return true;
-                }
-
                 continue;
             }
 
@@ -306,7 +363,7 @@ public final class ViewerSnapshotValidator {
                     next.getX(),
                     next.getY(),
                     next.getZ()
-            ) <= POSITION_TOLERANCE * POSITION_TOLERANCE) {
+            ) <= toleranceSquared) {
                 return true;
             }
         }

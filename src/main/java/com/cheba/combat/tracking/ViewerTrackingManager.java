@@ -238,7 +238,8 @@ public final class ViewerTrackingManager {
                     timestampNanos,
                     this.x,
                     this.y,
-                    this.z
+                    this.z,
+                    false
             ));
         }
 
@@ -257,13 +258,15 @@ public final class ViewerTrackingManager {
                 return false;
             }
 
-            if (packet instanceof SPacketEntityTeleport) {
-                SPacketEntityTeleport teleport =
+            boolean teleport = packet instanceof SPacketEntityTeleport;
+
+            if (teleport) {
+                SPacketEntityTeleport movement =
                         (SPacketEntityTeleport) packet;
 
-                x = quantizePosition(teleport.getX());
-                y = quantizePosition(teleport.getY());
-                z = quantizePosition(teleport.getZ());
+                x = quantizePosition(movement.getX());
+                y = quantizePosition(movement.getY());
+                z = quantizePosition(movement.getZ());
 
             } else if (packet instanceof SPacketEntity.S15PacketEntityRelMove
                     || packet instanceof SPacketEntity.S17PacketEntityLookMove) {
@@ -285,7 +288,8 @@ public final class ViewerTrackingManager {
                     timestampNanos,
                     x,
                     y,
-                    z
+                    z,
+                    teleport
             ));
 
             trim(timestampNanos);
@@ -341,6 +345,8 @@ public final class ViewerTrackingManager {
 
     public static final class SentState {
 
+        private final boolean teleport;
+
         private final int sequence;
         private final long timestampNanos;
 
@@ -353,13 +359,19 @@ public final class ViewerTrackingManager {
                 long timestampNanos,
                 double x,
                 double y,
-                double z
+                double z,
+                boolean teleport
         ) {
             this.sequence = sequence;
             this.timestampNanos = timestampNanos;
             this.x = x;
             this.y = y;
             this.z = z;
+            this.teleport = teleport;
+        }
+
+        public boolean isTeleport() {
+            return teleport;
         }
 
         public int getSequence() {
