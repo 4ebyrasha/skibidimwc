@@ -614,7 +614,7 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                                     + " | SegmentEnd=" + segmentEndNanos
                                     + " | Midpoint=" + midpointNanos
                                     + " | Reason=" + failureReason
-                                    + " | Fallback=CurrentAABB"
+                                    + " | Collision=SKIPPED"
                     );
                 } else {
                     CombatLog.trace(
@@ -623,9 +623,17 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                             "Historical target snapshot unavailable"
                                     + " | Projectile=" + getEntityId()
                                     + " | Target=" + player.getUniqueID()
-                                    + " | Fallback=CurrentAABB"
+                                    + " | Collision=SKIPPED"
                     );
                 }
+
+                /*
+                 * A server player with a valid projectile timeline must
+                 * never fall back to the current bounding box.
+                 * Missing historical data means no player collision
+                 * can be safely confirmed for this segment.
+                 */
+                continue;
             }
 
             /*
