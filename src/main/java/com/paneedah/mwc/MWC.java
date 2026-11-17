@@ -6,6 +6,8 @@ import com.cheba.combat.handlers.CombatHistoryEventHandler;
 import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
+import com.cheba.combat.tracking.message.TrackingMarkerMessage;
+import com.cheba.combat.tracking.message.TrackingMarkerMessageHandler;
 import com.cheba.effect.BulletSuppressionEffect;
 import com.cheba.knockback.KnockbackCapability;
 import com.cheba.knockback.KnockbackCapabilityHandler;
@@ -252,6 +254,13 @@ public final class MWC {
         CHANNEL.registerMessage(
                 new CombatTimeSyncResponseHandler(),
                 CombatTimeSyncResponse.class, -18, Side.CLIENT
+        );
+
+        CHANNEL.registerMessage(
+                new TrackingMarkerMessageHandler(),
+                TrackingMarkerMessage.class,
+                -19,
+                Side.CLIENT
         );
 
         // Server-bound messages
