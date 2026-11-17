@@ -2,6 +2,7 @@ package com.paneedah.weaponlib;
 
 import com.cheba.combat.client.ClientRenderedPlayerHistory;
 import com.cheba.combat.time.CombatClockSyncManager;
+import com.cheba.combat.tracking.ViewerSnapshotValidator;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
 import com.paneedah.mwc.instancing.Tags;
 import com.paneedah.mwc.network.NetworkPermitManager;
@@ -33,12 +34,7 @@ import net.minecraftforge.fml.common.network.NetworkRegistry.TargetPoint;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
@@ -817,6 +813,34 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             float shotYaw,
             float shotPitch,
             long serverShotTimestampNanos
+    ) {
+        serverFire(
+                player,
+                itemStack,
+                spawnEntityWith,
+                isBurst,
+                isAimed,
+                damageMultiplier,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch,
+                serverShotTimestampNanos,
+                java.util.Collections.emptyList()
+        );
+    }
+
+    public void serverFire(
+            EntityLivingBase player,
+            ItemStack itemStack,
+            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
+            boolean isBurst,
+            boolean isAimed,
+            float damageMultiplier,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch,
+            long serverShotTimestampNanos,
+            List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots
     ) {
         if (player == null
                 || itemStack == null

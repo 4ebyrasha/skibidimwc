@@ -2,6 +2,7 @@ package com.paneedah.mwc.network.handlers;
 
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
+import com.cheba.combat.tracking.ViewerSnapshotValidator;
 import com.paneedah.mwc.network.messages.TryFireMessage;
 import com.paneedah.weaponlib.Weapon;
 import com.paneedah.weaponlib.WeaponFireAspect;
@@ -15,14 +16,10 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
-/**
- * Handles client weapon fire requests.
- *
- * <p>Client timestamps are translated into the server monotonic
- * clock domain and clamped to the allowed rewind window.</p>
- */
 @NoArgsConstructor
 @AllArgsConstructor
 public final class TryFireMessageHandler
@@ -37,7 +34,6 @@ public final class TryFireMessageHandler
             final TryFireMessage message,
             final MessageContext context
     ) {
-        // Capture packet arrival before scheduling work on the server thread.
         final long serverPacketReceiveNanos = System.nanoTime();
 
         NetworkUtil.processMessage(context, () -> {
@@ -74,13 +70,6 @@ public final class TryFireMessageHandler
                             ? message.getClientShotTimestampNanos()
                             : serverPacketReceiveNanos;
 
-            /*
-             * A server receive timestamp must never be interpreted
-             * as a timestamp from the client's clock domain.
-             *
-             * Older message formats without a client timestamp use
-             * packet arrival time directly.
-             */
             long estimatedServerShotNanos =
                     hasClientTimestamp
                             ? CombatClockSyncManager.getEstimatedServerTime(
@@ -100,7 +89,6 @@ public final class TryFireMessageHandler
             long oldestAllowedTimestamp =
                     serverPacketReceiveNanos - MAX_REWIND_NANOS;
 
-            // Protect the lower bound against signed long underflow.
             if (oldestAllowedTimestamp > serverPacketReceiveNanos) {
                 oldestAllowedTimestamp = Long.MIN_VALUE;
             }
@@ -113,10 +101,6 @@ public final class TryFireMessageHandler
                     )
             );
 
-            /*
-             * No artificial angular restriction is applied here.
-             * Legitimate fast flicks must not be clamped.
-             */
             float shotYaw = player.rotationYaw;
             float shotPitch = player.rotationPitch;
 
@@ -128,11 +112,33 @@ public final class TryFireMessageHandler
                         && Float.isFinite(clientPitch)
                         && clientPitch >= -90.0F
                         && clientPitch <= 90.0F) {
-
                     shotYaw = MathHelper.wrapDegrees(clientYaw);
                     shotPitch = clientPitch;
                 }
             }
+
+            List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots =
+                    clockSynchronized
+                            ? ViewerSnapshotValidator.validate(
+                            player,
+                            message.getTargetSnapshots(),
+                            clientShotTimestampNanos,
+                            serverShotTimestampNanos
+                    )
+                            : Collections.emptyList();
+
+            CombatLog.debug(
+                    "TryFireMessageHandler",
+                    "onMessage",
+                    "Viewer snapshots validated"
+                            + " | Player=" + playerId
+                            + " | SubmittedTargets="
+                            + (message.getTargetSnapshots() == null
+                            ? 0
+                            : message.getTargetSnapshots().size())
+                            + " | AcceptedTargets=" + viewerSnapshots.size()
+                            + " | ClockSynchronized=" + clockSynchronized
+            );
 
             CombatLog.debug(
                     "TryFireMessageHandler",
@@ -156,7 +162,8 @@ public final class TryFireMessageHandler
                     clientShotTimestampNanos,
                     shotYaw,
                     shotPitch,
-                    serverShotTimestampNanos
+                    serverShotTimestampNanos,
+                    viewerSnapshots
             );
         });
 
