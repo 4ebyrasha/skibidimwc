@@ -158,11 +158,12 @@ public final class ViewerSnapshotValidator {
                 int stateIndex = findStateIndex(states, sequence);
 
                 if (stateIndex < 0
-                        || hasTeleportBetween(
+                        || (previousStateIndex >= 0
+                        && hasTeleportBetween(
                         states,
                         previousStateIndex,
                         stateIndex
-                )) {
+                ))) {
                     invalidSequence = true;
                     break;
                 }

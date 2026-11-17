@@ -29,7 +29,7 @@ public final class ClientRenderedPlayerHistory {
             AxisAlignedBB boundingBox
     ) {
         if (entityId < 0 || epoch <= 0L || sequence < 0
-                || timestampNanos <= 0L || boundingBox == null) {
+                || boundingBox == null) {
             return;
         }
 
