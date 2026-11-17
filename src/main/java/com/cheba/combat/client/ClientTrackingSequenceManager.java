@@ -31,6 +31,10 @@ public final class ClientTrackingSequenceManager {
                     && sequence <= current.sequence) {
                 return;
             }
+
+            if (current.epoch != epoch) {
+                ClientRenderedPlayerHistory.remove(entityId);
+            }
         }
 
         SEQUENCES.put(
@@ -45,10 +49,12 @@ public final class ClientTrackingSequenceManager {
 
     public static void remove(int entityId) {
         SEQUENCES.remove(entityId);
+        ClientRenderedPlayerHistory.remove(entityId);
     }
 
     public static void clear() {
         SEQUENCES.clear();
+        ClientRenderedPlayerHistory.clear();
     }
 
     public static final class TrackingSequence {
