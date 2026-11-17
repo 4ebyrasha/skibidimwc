@@ -1,5 +1,6 @@
 package com.cheba.combat.tracking;
 
+import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.TryFireMessage;
 import net.minecraft.entity.Entity;
@@ -9,7 +10,10 @@ import net.minecraft.util.math.AxisAlignedBB;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 public final class ViewerSnapshotValidator {
 
@@ -19,22 +23,13 @@ public final class ViewerSnapshotValidator {
     private static final long MAX_RENDER_AFTER_SEND_NANOS =
             200_000_000L;
 
-    private static final long MAX_REWIND_NANOS = 200_000_000L;
+    private static final long MAX_REWIND_NANOS =
+            200_000_000L;
 
-    /*
-     * EntityOtherPlayerMP renders an interpolated position.
-     * Allow the last three movement transitions preceding
-     * the acknowledged sequence.
-     */
     private static final int MAX_INTERPOLATION_STATES = 3;
 
     private static final double POSITION_TOLERANCE = 0.20D;
     private static final double SIZE_TOLERANCE = 0.05D;
-
-    /*
-     * A large displacement is treated as a discontinuity.
-     * Do not accept arbitrary points along a teleport-like segment.
-     */
     private static final double MAX_INTERPOLATION_DISTANCE = 2.5D;
 
     private ViewerSnapshotValidator() {
@@ -57,15 +52,38 @@ public final class ViewerSnapshotValidator {
         }
 
         List<ValidatedTarget> result = new ArrayList<>();
-        java.util.Set<Integer> processedEntityIds = new java.util.HashSet<>();
+        Set<Integer> processedEntityIds = new HashSet<>();
+
+        int rejectedTargets = 0;
 
         for (TryFireMessage.TargetSnapshots targetData : submitted) {
-            if (targetData == null
-                    || targetData.getSnapshots() == null
-                    || targetData.getSnapshots().isEmpty()
-                    || targetData.getSnapshots().size()
-                    > TryFireMessage.MAX_SNAPSHOTS_PER_TARGET
-                    || !processedEntityIds.add(targetData.getEntityId())) {
+
+            if (targetData == null) {
+                reject(observer, null, "NULL_TARGET_DATA", "");
+                rejectedTargets++;
+                continue;
+            }
+
+            List<TryFireMessage.Snapshot> snapshots =
+                    targetData.getSnapshots();
+
+            if (snapshots == null || snapshots.isEmpty()) {
+                reject(observer, targetData, "EMPTY_SNAPSHOTS", "");
+                rejectedTargets++;
+                continue;
+            }
+
+            if (snapshots.size()
+                    > TryFireMessage.MAX_SNAPSHOTS_PER_TARGET) {
+                reject(observer, targetData, "TOO_MANY_SNAPSHOTS",
+                        "Count=" + snapshots.size());
+                rejectedTargets++;
+                continue;
+            }
+
+            if (!processedEntityIds.add(targetData.getEntityId())) {
+                reject(observer, targetData, "DUPLICATE_TARGET", "");
+                rejectedTargets++;
                 continue;
             }
 
@@ -74,14 +92,31 @@ public final class ViewerSnapshotValidator {
             );
 
             if (!(entity instanceof EntityPlayerMP)) {
+                reject(observer, targetData, "TARGET_NOT_FOUND_OR_NOT_PLAYER",
+                        "");
+                rejectedTargets++;
                 continue;
             }
 
             EntityPlayerMP target = (EntityPlayerMP) entity;
 
-            if (target == observer
-                    || target.isDead
-                    || target.dimension != observer.dimension) {
+            if (target == observer) {
+                reject(observer, targetData, "TARGET_IS_OBSERVER", "");
+                rejectedTargets++;
+                continue;
+            }
+
+            if (target.isDead) {
+                reject(observer, targetData, "TARGET_IS_DEAD", "");
+                rejectedTargets++;
+                continue;
+            }
+
+            if (target.dimension != observer.dimension) {
+                reject(observer, targetData, "DIMENSION_MISMATCH",
+                        "ObserverDimension=" + observer.dimension
+                                + " | TargetDimension=" + target.dimension);
+                rejectedTargets++;
                 continue;
             }
 
@@ -91,10 +126,29 @@ public final class ViewerSnapshotValidator {
                             target.getUniqueID()
                     );
 
-            if (tracking == null
-                    || tracking.getEntityId() != target.getEntityId()
-                    || tracking.getDimension() != target.dimension
-                    || tracking.getEpoch() != targetData.getEpoch()) {
+            if (tracking == null) {
+                reject(observer, targetData, "TRACKING_STATE_MISSING", "");
+                rejectedTargets++;
+                continue;
+            }
+
+            if (tracking.getEntityId() != target.getEntityId()
+                    || tracking.getDimension() != target.dimension) {
+                reject(observer, targetData, "TRACKING_IDENTITY_MISMATCH",
+                        "TrackingEntityId=" + tracking.getEntityId()
+                                + " | TargetEntityId=" + target.getEntityId()
+                                + " | TrackingDimension="
+                                + tracking.getDimension()
+                                + " | TargetDimension=" + target.dimension);
+                rejectedTargets++;
+                continue;
+            }
+
+            if (tracking.getEpoch() != targetData.getEpoch()) {
+                reject(observer, targetData, "EPOCH_MISMATCH",
+                        "Expected=" + tracking.getEpoch()
+                                + " | Received=" + targetData.getEpoch());
+                rejectedTargets++;
                 continue;
             }
 
@@ -102,6 +156,8 @@ public final class ViewerSnapshotValidator {
                     tracking.getSentStates();
 
             if (sentStates.isEmpty()) {
+                reject(observer, targetData, "SENT_HISTORY_EMPTY", "");
+                rejectedTargets++;
                 continue;
             }
 
@@ -116,24 +172,37 @@ public final class ViewerSnapshotValidator {
             int latestStateIndex = -1;
 
             boolean hasPreviousTimestamp = false;
-            boolean invalidSequence = false;
+            String rejectionReason = null;
+            String rejectionDetails = "";
 
-            for (TryFireMessage.Snapshot snapshot
-                    : targetData.getSnapshots()) {
+            for (TryFireMessage.Snapshot snapshot : snapshots) {
 
-                if (snapshot == null
-                        || snapshot.getBoundingBox() == null) {
-                    invalidSequence = true;
+                if (snapshot == null) {
+                    rejectionReason = "NULL_SNAPSHOT";
+                    break;
+                }
+
+                AxisAlignedBB box = snapshot.getBoundingBox();
+
+                if (box == null) {
+                    rejectionReason = "NULL_SNAPSHOT_AABB";
                     break;
                 }
 
                 long clientTimestamp = snapshot.getTimestampNanos();
                 int sequence = snapshot.getSequence();
 
-                if ((hasPreviousTimestamp
-                        && clientTimestamp <= previousClientTimestamp)
-                        || sequence <= previousSequence) {
-                    invalidSequence = true;
+                if (hasPreviousTimestamp
+                        && clientTimestamp <= previousClientTimestamp) {
+                    rejectionReason = "TIMESTAMP_NOT_INCREASING";
+                    rejectionDetails = "Sequence=" + sequence;
+                    break;
+                }
+
+                if (sequence <= previousSequence) {
+                    rejectionReason = "SEQUENCE_NOT_INCREASING";
+                    rejectionDetails = "Previous=" + previousSequence
+                            + " | Received=" + sequence;
                     break;
                 }
 
@@ -145,31 +214,43 @@ public final class ViewerSnapshotValidator {
                             clientTimestamp
                     );
                 } catch (ArithmeticException exception) {
-                    invalidSequence = true;
+                    rejectionReason = "SNAPSHOT_AGE_OVERFLOW";
                     break;
                 }
 
-                if (snapshotAge < 0L
-                        || snapshotAge > MAX_REWIND_NANOS) {
-                    invalidSequence = true;
+                if (snapshotAge < 0L) {
+                    rejectionReason = "SNAPSHOT_FROM_FUTURE";
+                    rejectionDetails = "AgeNanos=" + snapshotAge;
+                    break;
+                }
+
+                if (snapshotAge > MAX_REWIND_NANOS) {
+                    rejectionReason = "SNAPSHOT_TOO_OLD";
+                    rejectionDetails = "AgeMs="
+                            + snapshotAge / 1_000_000.0D;
                     break;
                 }
 
                 int stateIndex = findStateIndex(states, sequence);
 
-                if (stateIndex < 0
-                        || (previousStateIndex >= 0
+                if (stateIndex < 0) {
+                    rejectionReason = "SENT_SEQUENCE_NOT_FOUND";
+                    rejectionDetails = "Sequence=" + sequence;
+                    break;
+                }
+
+                if (previousStateIndex >= 0
                         && hasTeleportBetween(
                         states,
                         previousStateIndex,
                         stateIndex
-                ))) {
-                    invalidSequence = true;
+                )) {
+                    rejectionReason = "TELEPORT_BETWEEN_SNAPSHOTS";
+                    rejectionDetails = "PreviousSequence="
+                            + states.get(previousStateIndex).getSequence()
+                            + " | CurrentSequence=" + sequence;
                     break;
                 }
-
-                previousStateIndex = stateIndex;
-                latestStateIndex = stateIndex;
 
                 ViewerTrackingManager.SentState sentState =
                         states.get(stateIndex);
@@ -182,17 +263,17 @@ public final class ViewerSnapshotValidator {
 
                 if (mappedClientTimestamp
                         == CombatClockSyncManager.NO_ESTIMATE) {
-                    invalidSequence = true;
+                    rejectionReason = "CLOCK_SYNC_UNAVAILABLE";
+                    rejectionDetails = "Sequence=" + sequence;
                     break;
                 }
-
-                AxisAlignedBB box = snapshot.getBoundingBox();
 
                 if (!hasValidDimensions(
                         box,
                         target.getEntityBoundingBox()
                 )) {
-                    invalidSequence = true;
+                    rejectionReason = "INVALID_AABB_DIMENSIONS";
+                    rejectionDetails = "Sequence=" + sequence;
                     break;
                 }
 
@@ -201,7 +282,8 @@ public final class ViewerSnapshotValidator {
                         states,
                         stateIndex
                 )) {
-                    invalidSequence = true;
+                    rejectionReason = "SENT_TRAJECTORY_MISMATCH";
+                    rejectionDetails = "Sequence=" + sequence;
                     break;
                 }
 
@@ -213,15 +295,9 @@ public final class ViewerSnapshotValidator {
                             snapshotAge
                     );
                 } catch (ArithmeticException exception) {
-                    invalidSequence = true;
+                    rejectionReason = "SERVER_TIMESTAMP_OVERFLOW";
                     break;
                 }
-
-                accepted.add(new ValidatedSnapshot(
-                        sequence,
-                        serverTimestamp,
-                        box
-                ));
 
                 long clockMappingError;
                 long renderAfterSend;
@@ -237,38 +313,85 @@ public final class ViewerSnapshotValidator {
                             sentState.getTimestampNanos()
                     );
                 } catch (ArithmeticException exception) {
-                    invalidSequence = true;
+                    rejectionReason = "CLOCK_CALCULATION_OVERFLOW";
                     break;
                 }
 
                 if (clockMappingError < -MAX_CLOCK_MAPPING_ERROR_NANOS
-                        || clockMappingError > MAX_CLOCK_MAPPING_ERROR_NANOS
-                        || renderAfterSend < -MAX_CLOCK_MAPPING_ERROR_NANOS
-                        || renderAfterSend > MAX_RENDER_AFTER_SEND_NANOS) {
-                    invalidSequence = true;
+                        || clockMappingError > MAX_CLOCK_MAPPING_ERROR_NANOS) {
+                    rejectionReason = "CLOCK_MAPPING_ERROR";
+                    rejectionDetails = "Sequence=" + sequence
+                            + " | ErrorMs="
+                            + clockMappingError / 1_000_000.0D;
                     break;
                 }
 
+                if (renderAfterSend < -MAX_CLOCK_MAPPING_ERROR_NANOS
+                        || renderAfterSend > MAX_RENDER_AFTER_SEND_NANOS) {
+                    rejectionReason = "RENDER_AFTER_SEND_OUT_OF_RANGE";
+                    rejectionDetails = "Sequence=" + sequence
+                            + " | RenderAfterSendMs="
+                            + renderAfterSend / 1_000_000.0D;
+                    break;
+                }
+
+                accepted.add(new ValidatedSnapshot(
+                        sequence,
+                        serverTimestamp,
+                        box
+                ));
+
+                CombatLog.trace(
+                        "ViewerSnapshotValidator",
+                        "validate",
+                        "Accepted snapshot"
+                                + " | Observer=" + observer.getUniqueID()
+                                + " | Target=" + target.getUniqueID()
+                                + " | Sequence=" + sequence
+                                + " | AgeMs="
+                                + snapshotAge / 1_000_000.0D
+                                + " | ClockErrorMs="
+                                + clockMappingError / 1_000_000.0D
+                                + " | RenderAfterSendMs="
+                                + renderAfterSend / 1_000_000.0D
+                );
+
                 previousClientTimestamp = clientTimestamp;
                 previousSequence = sequence;
+                previousStateIndex = stateIndex;
+                latestStateIndex = stateIndex;
                 hasPreviousTimestamp = true;
             }
 
-            /*
-             * Reject viewer history if the target was teleported after
-             * the latest rendered snapshot but before the shot.
-             */
-            if (!invalidSequence
+            if (rejectionReason == null
                     && latestStateIndex >= 0
                     && hasTeleportBetween(
                     states,
                     latestStateIndex,
                     states.size() - 1
             )) {
-                invalidSequence = true;
+                rejectionReason = "TELEPORT_AFTER_LATEST_SNAPSHOT";
+                rejectionDetails = "LatestSequence="
+                        + states.get(latestStateIndex).getSequence();
             }
 
-            if (invalidSequence || accepted.size() != targetData.getSnapshots().size()) {
+            if (rejectionReason != null
+                    || accepted.size() != snapshots.size()) {
+
+                if (rejectionReason == null) {
+                    rejectionReason = "SNAPSHOT_COUNT_MISMATCH";
+                    rejectionDetails = "Accepted=" + accepted.size()
+                            + " | Submitted=" + snapshots.size();
+                }
+
+                reject(
+                        observer,
+                        targetData,
+                        rejectionReason,
+                        rejectionDetails
+                );
+
+                rejectedTargets++;
                 continue;
             }
 
@@ -278,9 +401,59 @@ public final class ViewerSnapshotValidator {
                     tracking.getEpoch(),
                     accepted
             ));
+
+            CombatLog.debug(
+                    "ViewerSnapshotValidator",
+                    "validate",
+                    "Accepted target"
+                            + " | Observer=" + observer.getUniqueID()
+                            + " | Target=" + target.getUniqueID()
+                            + " | EntityId=" + target.getEntityId()
+                            + " | Epoch=" + tracking.getEpoch()
+                            + " | Snapshots=" + accepted.size()
+            );
         }
 
+        CombatLog.debug(
+                "ViewerSnapshotValidator",
+                "validate",
+                "Validation completed"
+                        + " | Observer=" + observer.getUniqueID()
+                        + " | SubmittedTargets=" + submitted.size()
+                        + " | AcceptedTargets=" + result.size()
+                        + " | RejectedTargets=" + rejectedTargets
+        );
+
         return result;
+    }
+
+    private static void reject(
+            EntityPlayerMP observer,
+            TryFireMessage.TargetSnapshots targetData,
+            String reason,
+            String details
+    ) {
+        CombatLog.debug(
+                "ViewerSnapshotValidator",
+                "validate",
+                "Rejected target"
+                        + " | Observer="
+                        + (observer == null
+                        ? "null"
+                        : observer.getUniqueID())
+                        + " | EntityId="
+                        + (targetData == null
+                        ? "unknown"
+                        : targetData.getEntityId())
+                        + " | Epoch="
+                        + (targetData == null
+                        ? "unknown"
+                        : targetData.getEpoch())
+                        + " | Reason=" + reason
+                        + (details == null || details.isEmpty()
+                        ? ""
+                        : " | " + details)
+        );
     }
 
     private static boolean hasTeleportBetween(
@@ -348,9 +521,6 @@ public final class ViewerSnapshotValidator {
                 stateIndex - MAX_INTERPOLATION_STATES
         );
 
-        /*
-         * Ignore every movement segment before the latest teleport.
-         */
         for (int i = firstIndex + 1; i <= stateIndex; i++) {
             if (states.get(i).isTeleport()) {
                 firstIndex = i;
@@ -453,13 +623,13 @@ public final class ViewerSnapshotValidator {
 
     public static final class ValidatedTarget {
 
-        private final java.util.UUID targetId;
+        private final UUID targetId;
         private final int entityId;
         private final long epoch;
         private final List<ValidatedSnapshot> snapshots;
 
         private ValidatedTarget(
-                java.util.UUID targetId,
+                UUID targetId,
                 int entityId,
                 long epoch,
                 List<ValidatedSnapshot> snapshots
@@ -472,7 +642,7 @@ public final class ViewerSnapshotValidator {
             );
         }
 
-        public java.util.UUID getTargetId() {
+        public UUID getTargetId() {
             return targetId;
         }
 
