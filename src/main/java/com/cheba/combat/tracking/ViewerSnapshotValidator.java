@@ -112,6 +112,9 @@ public final class ViewerSnapshotValidator {
 
             long previousClientTimestamp = 0L;
             int previousSequence = -1;
+            int previousStateIndex = -1;
+            int latestStateIndex = -1;
+
             boolean hasPreviousTimestamp = false;
             boolean invalidSequence = false;
 
@@ -154,10 +157,18 @@ public final class ViewerSnapshotValidator {
 
                 int stateIndex = findStateIndex(states, sequence);
 
-                if (stateIndex < 0) {
+                if (stateIndex < 0
+                        || hasTeleportBetween(
+                        states,
+                        previousStateIndex,
+                        stateIndex
+                )) {
                     invalidSequence = true;
                     break;
                 }
+
+                previousStateIndex = stateIndex;
+                latestStateIndex = stateIndex;
 
                 ViewerTrackingManager.SentState sentState =
                         states.get(stateIndex);
@@ -242,8 +253,21 @@ public final class ViewerSnapshotValidator {
                 hasPreviousTimestamp = true;
             }
 
-            if (invalidSequence
-                    || accepted.size() != targetData.getSnapshots().size()) {
+            /*
+             * Reject viewer history if the target was teleported after
+             * the latest rendered snapshot but before the shot.
+             */
+            if (!invalidSequence
+                    && latestStateIndex >= 0
+                    && hasTeleportBetween(
+                    states,
+                    latestStateIndex,
+                    states.size() - 1
+            )) {
+                invalidSequence = true;
+            }
+
+            if (invalidSequence || accepted.size() != targetData.getSnapshots().size()) {
                 continue;
             }
 
@@ -256,6 +280,23 @@ public final class ViewerSnapshotValidator {
         }
 
         return result;
+    }
+
+    private static boolean hasTeleportBetween(
+            List<ViewerTrackingManager.SentState> states,
+            int afterExclusive,
+            int throughInclusive
+    ) {
+        for (int i = Math.max(0, afterExclusive + 1);
+             i <= throughInclusive;
+             i++) {
+
+            if (states.get(i).isTeleport()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static int findStateIndex(
