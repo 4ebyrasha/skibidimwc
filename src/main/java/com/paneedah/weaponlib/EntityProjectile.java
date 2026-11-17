@@ -886,27 +886,13 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         /*
-         * If one boundary is unavailable, use the midpoint hitbox.
-         * Apply the same viewer correction to it.
+         * Both segment boundaries must have valid historical states.
+         * A midpoint-only hitbox cannot reliably represent a moving target
+         * across the entire projectile segment.
          */
         if (!isValidHistoricalState(player, startState)
                 || !isValidHistoricalState(player, endState)) {
-
-            AxisAlignedBB fallbackBox =
-                    midpointState.getBoundingBox().offset(
-                            viewerOffset.x,
-                            viewerOffset.y,
-                            viewerOffset.z
-                    ).grow(0.15D);
-
-            RayTraceResult fallbackHit =
-                    fallbackBox.calculateIntercept(start, end);
-
-            if (fallbackHit == null || fallbackHit.hitVec == null) {
-                return null;
-            }
-
-            return new RayTraceResult(player, fallbackHit.hitVec);
+            return null;
         }
 
         /*
