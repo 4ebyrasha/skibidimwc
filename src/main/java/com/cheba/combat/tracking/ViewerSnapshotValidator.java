@@ -1,0 +1,393 @@
+package com.cheba.combat.tracking;
+
+import com.paneedah.mwc.network.messages.TryFireMessage;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.util.math.AxisAlignedBB;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.List;
+
+public final class ViewerSnapshotValidator {
+
+    private static final long MAX_REWIND_NANOS = 200_000_000L;
+
+    /*
+     * EntityOtherPlayerMP renders an interpolated position.
+     * Allow the last three movement transitions preceding
+     * the acknowledged sequence.
+     */
+    private static final int MAX_INTERPOLATION_STATES = 3;
+
+    private static final double POSITION_TOLERANCE = 0.20D;
+    private static final double SIZE_TOLERANCE = 0.05D;
+
+    /*
+     * A large displacement is treated as a discontinuity.
+     * Do not accept arbitrary points along a teleport-like segment.
+     */
+    private static final double MAX_INTERPOLATION_DISTANCE = 2.5D;
+
+    private ViewerSnapshotValidator() {
+    }
+
+    public static List<ValidatedTarget> validate(
+            EntityPlayerMP observer,
+            List<TryFireMessage.TargetSnapshots> submitted,
+            long clientShotTimestampNanos,
+            long serverShotTimestampNanos
+    ) {
+        if (observer == null
+                || observer.world == null
+                || observer.world.isRemote
+                || submitted == null
+                || clientShotTimestampNanos <= 0L
+                || serverShotTimestampNanos <= 0L) {
+            return Collections.emptyList();
+        }
+
+        List<ValidatedTarget> result = new ArrayList<>();
+
+        for (TryFireMessage.TargetSnapshots targetData : submitted) {
+            if (targetData == null
+                    || targetData.getSnapshots().isEmpty()) {
+                continue;
+            }
+
+            Entity entity = observer.world.getEntityByID(
+                    targetData.getEntityId()
+            );
+
+            if (!(entity instanceof EntityPlayerMP)) {
+                continue;
+            }
+
+            EntityPlayerMP target = (EntityPlayerMP) entity;
+
+            if (target == observer
+                    || target.isDead
+                    || target.dimension != observer.dimension) {
+                continue;
+            }
+
+            ViewerTrackingManager.ViewerTrackingState tracking =
+                    ViewerTrackingManager.getState(
+                            observer.getUniqueID(),
+                            target.getUniqueID()
+                    );
+
+            if (tracking == null
+                    || tracking.getEntityId() != target.getEntityId()
+                    || tracking.getDimension() != target.dimension
+                    || tracking.getEpoch() != targetData.getEpoch()) {
+                continue;
+            }
+
+            Deque<ViewerTrackingManager.SentState> sentStates =
+                    tracking.getSentStates();
+
+            if (sentStates.isEmpty()) {
+                continue;
+            }
+
+            List<ViewerTrackingManager.SentState> states =
+                    new ArrayList<>(sentStates);
+
+            List<ValidatedSnapshot> accepted =
+                    new ArrayList<>();
+
+            long previousClientTimestamp = 0L;
+            int previousSequence = -1;
+
+            for (TryFireMessage.Snapshot snapshot
+                    : targetData.getSnapshots()) {
+
+                if (snapshot == null
+                        || snapshot.getBoundingBox() == null) {
+                    continue;
+                }
+
+                long clientTimestamp =
+                        snapshot.getTimestampNanos();
+
+                int sequence = snapshot.getSequence();
+
+                if (clientTimestamp <= 0L
+                        || clientTimestamp > clientShotTimestampNanos
+                        || clientShotTimestampNanos - clientTimestamp
+                        > MAX_REWIND_NANOS
+                        || clientTimestamp < previousClientTimestamp
+                        || sequence < previousSequence) {
+                    continue;
+                }
+
+                int stateIndex = findStateIndex(states, sequence);
+
+                if (stateIndex < 0) {
+                    continue;
+                }
+
+                AxisAlignedBB box = snapshot.getBoundingBox();
+
+                if (!hasValidDimensions(
+                        box,
+                        target.getEntityBoundingBox()
+                )) {
+                    continue;
+                }
+
+                if (!matchesSentTrajectory(
+                        box,
+                        states,
+                        stateIndex
+                )) {
+                    continue;
+                }
+
+                long snapshotAge =
+                        clientShotTimestampNanos - clientTimestamp;
+
+                long serverTimestamp =
+                        serverShotTimestampNanos - snapshotAge;
+
+                accepted.add(new ValidatedSnapshot(
+                        sequence,
+                        serverTimestamp,
+                        box
+                ));
+
+                previousClientTimestamp = clientTimestamp;
+                previousSequence = sequence;
+            }
+
+            if (!accepted.isEmpty()) {
+                result.add(new ValidatedTarget(
+                        target.getUniqueID(),
+                        target.getEntityId(),
+                        tracking.getEpoch(),
+                        accepted
+                ));
+            }
+        }
+
+        return result;
+    }
+
+    private static int findStateIndex(
+            List<ViewerTrackingManager.SentState> states,
+            int sequence
+    ) {
+        for (int i = states.size() - 1; i >= 0; i--) {
+            if (states.get(i).getSequence() == sequence) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static boolean hasValidDimensions(
+            AxisAlignedBB submitted,
+            AxisAlignedBB expected
+    ) {
+        return Math.abs(
+                (submitted.maxX - submitted.minX)
+                        - (expected.maxX - expected.minX)
+        ) <= SIZE_TOLERANCE
+                && Math.abs(
+                (submitted.maxY - submitted.minY)
+                        - (expected.maxY - expected.minY)
+        ) <= SIZE_TOLERANCE
+                && Math.abs(
+                (submitted.maxZ - submitted.minZ)
+                        - (expected.maxZ - expected.minZ)
+        ) <= SIZE_TOLERANCE;
+    }
+
+    private static boolean matchesSentTrajectory(
+            AxisAlignedBB box,
+            List<ViewerTrackingManager.SentState> states,
+            int stateIndex
+    ) {
+        double x = (box.minX + box.maxX) * 0.5D;
+        double y = box.minY;
+        double z = (box.minZ + box.maxZ) * 0.5D;
+
+        int firstIndex = Math.max(
+                0,
+                stateIndex - MAX_INTERPOLATION_STATES
+        );
+
+        ViewerTrackingManager.SentState current =
+                states.get(stateIndex);
+
+        if (stateIndex == firstIndex) {
+            return distanceSquared(
+                    x, y, z,
+                    current.getX(),
+                    current.getY(),
+                    current.getZ()
+            ) <= POSITION_TOLERANCE * POSITION_TOLERANCE;
+        }
+
+        for (int i = firstIndex + 1; i <= stateIndex; i++) {
+            ViewerTrackingManager.SentState previous =
+                    states.get(i - 1);
+
+            ViewerTrackingManager.SentState next =
+                    states.get(i);
+
+            double dx = next.getX() - previous.getX();
+            double dy = next.getY() - previous.getY();
+            double dz = next.getZ() - previous.getZ();
+
+            double lengthSquared =
+                    dx * dx + dy * dy + dz * dz;
+
+            if (lengthSquared
+                    > MAX_INTERPOLATION_DISTANCE
+                    * MAX_INTERPOLATION_DISTANCE) {
+
+                if (distanceSquared(
+                        x, y, z,
+                        next.getX(),
+                        next.getY(),
+                        next.getZ()
+                ) <= POSITION_TOLERANCE * POSITION_TOLERANCE) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (distanceToSegmentSquared(
+                    x, y, z,
+                    previous.getX(),
+                    previous.getY(),
+                    previous.getZ(),
+                    next.getX(),
+                    next.getY(),
+                    next.getZ()
+            ) <= POSITION_TOLERANCE * POSITION_TOLERANCE) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static double distanceToSegmentSquared(
+            double px, double py, double pz,
+            double ax, double ay, double az,
+            double bx, double by, double bz
+    ) {
+        double dx = bx - ax;
+        double dy = by - ay;
+        double dz = bz - az;
+
+        double lengthSquared =
+                dx * dx + dy * dy + dz * dz;
+
+        if (lengthSquared <= 1.0E-12D) {
+            return distanceSquared(
+                    px, py, pz,
+                    ax, ay, az
+            );
+        }
+
+        double progress = (
+                (px - ax) * dx
+                        + (py - ay) * dy
+                        + (pz - az) * dz
+        ) / lengthSquared;
+
+        progress = Math.max(0.0D, Math.min(1.0D, progress));
+
+        return distanceSquared(
+                px, py, pz,
+                ax + dx * progress,
+                ay + dy * progress,
+                az + dz * progress
+        );
+    }
+
+    private static double distanceSquared(
+            double ax, double ay, double az,
+            double bx, double by, double bz
+    ) {
+        double dx = ax - bx;
+        double dy = ay - by;
+        double dz = az - bz;
+
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    public static final class ValidatedTarget {
+
+        private final java.util.UUID targetId;
+        private final int entityId;
+        private final long epoch;
+        private final List<ValidatedSnapshot> snapshots;
+
+        private ValidatedTarget(
+                java.util.UUID targetId,
+                int entityId,
+                long epoch,
+                List<ValidatedSnapshot> snapshots
+        ) {
+            this.targetId = targetId;
+            this.entityId = entityId;
+            this.epoch = epoch;
+            this.snapshots = Collections.unmodifiableList(
+                    new ArrayList<>(snapshots)
+            );
+        }
+
+        public java.util.UUID getTargetId() {
+            return targetId;
+        }
+
+        public int getEntityId() {
+            return entityId;
+        }
+
+        public long getEpoch() {
+            return epoch;
+        }
+
+        public List<ValidatedSnapshot> getSnapshots() {
+            return snapshots;
+        }
+    }
+
+    public static final class ValidatedSnapshot {
+
+        private final int sequence;
+        private final long timestampNanos;
+        private final AxisAlignedBB boundingBox;
+
+        private ValidatedSnapshot(
+                int sequence,
+                long timestampNanos,
+                AxisAlignedBB boundingBox
+        ) {
+            this.sequence = sequence;
+            this.timestampNanos = timestampNanos;
+            this.boundingBox = boundingBox;
+        }
+
+        public int getSequence() {
+            return sequence;
+        }
+
+        public long getTimestampNanos() {
+            return timestampNanos;
+        }
+
+        public AxisAlignedBB getBoundingBox() {
+            return boundingBox;
+        }
+    }
+}
