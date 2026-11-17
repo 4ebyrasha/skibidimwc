@@ -100,7 +100,7 @@ public final class ViewerTrackingManager {
             return;
         }
 
-        if (!state.applyMovement(packet, System.nanoTime())) {
+        if (!state.applyMovement(packet, target, System.nanoTime())) {
             return;
         }
 
@@ -245,8 +245,13 @@ public final class ViewerTrackingManager {
 
         private boolean applyMovement(
                 Packet<?> packet,
+                EntityPlayerMP target,
                 long timestampNanos
         ) {
+            if (packet == null || target == null) {
+                return false;
+            }
+
             if (sequence == Integer.MAX_VALUE) {
                 CombatLog.warn(
                         "ViewerTrackingManager",
@@ -260,23 +265,14 @@ public final class ViewerTrackingManager {
 
             boolean teleport = packet instanceof SPacketEntityTeleport;
 
-            if (teleport) {
-                SPacketEntityTeleport movement =
-                        (SPacketEntityTeleport) packet;
+            boolean positionChanged = teleport
+                    || packet instanceof SPacketEntity.S15PacketEntityRelMove
+                    || packet instanceof SPacketEntity.S17PacketEntityLookMove;
 
-                x = quantizePosition(movement.getX());
-                y = quantizePosition(movement.getY());
-                z = quantizePosition(movement.getZ());
-
-            } else if (packet instanceof SPacketEntity.S15PacketEntityRelMove
-                    || packet instanceof SPacketEntity.S17PacketEntityLookMove) {
-
-                SPacketEntity movement = (SPacketEntity) packet;
-
-                x += movement.getX() / POSITION_SCALE;
-                y += movement.getY() / POSITION_SCALE;
-                z += movement.getZ() / POSITION_SCALE;
-
+            if (positionChanged) {
+                x = quantizePosition(target.posX);
+                y = quantizePosition(target.posY);
+                z = quantizePosition(target.posZ);
             } else if (!(packet instanceof SPacketEntity.S16PacketEntityLook)) {
                 return false;
             }
