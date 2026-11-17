@@ -44,6 +44,9 @@ import java.util.function.Predicate;
 import static com.paneedah.mwc.MWC.CHANNEL;
 import static com.paneedah.mwc.ProjectConstants.LOGGER;
 import static com.paneedah.mwc.proxies.ClientProxy.MC;
+import com.cheba.combat.client.ClientShotSnapshotCollector;
+import com.paneedah.mwc.network.messages.TryFireMessage.TargetSnapshots;
+import com.paneedah.mwc.network.messages.TryFireMessage.Snapshot;
 
 import com.paneedah.mwc.client.audio.GunshotPositionedSound;
 import net.minecraft.client.audio.ISound;
@@ -403,20 +406,32 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         long clientShotTimestampNanos = System.nanoTime();
 
-        // Сохраняем направление прицела до применения отдачи.
         float shotYaw = player.rotationYaw;
         float shotPitch = player.rotationPitch;
 
-        CHANNEL.sendToServer(
-                new TryFireMessage(
-                        oneClickBurstEnabled.test(weaponInstance)
-                                && weaponInstance.getSeriesShotCount() == 0,
-                        weaponInstance.isAimed(),
-                        clientShotTimestampNanos,
-                        shotYaw,
-                        shotPitch
-                )
-        );
+        boolean burst = oneClickBurstEnabled.test(weaponInstance)
+                && weaponInstance.getSeriesShotCount() == 0;
+
+        boolean aimed = weaponInstance.isAimed();
+
+        if (player.world.isRemote) {
+            CHANNEL.sendToServer(new TryFireMessage(
+                    burst,
+                    aimed,
+                    clientShotTimestampNanos,
+                    shotYaw,
+                    shotPitch,
+                    collectShotSnapshots(player, clientShotTimestampNanos)
+            ));
+        } else {
+            CHANNEL.sendToServer(new TryFireMessage(
+                    burst,
+                    aimed,
+                    clientShotTimestampNanos,
+                    shotYaw,
+                    shotPitch
+            ));
+        }
 
         boolean silencerOn =
                 modContext.getAttachmentAspect().isSilencerOn(weaponInstance);
@@ -599,6 +614,50 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         weaponInstance.setLastFireTimestamp(System.currentTimeMillis());
 
         weaponInstance.setAmmo(currentAmmo - 1);
+    }
+
+    @SideOnly(Side.CLIENT)
+    private static java.util.List<TargetSnapshots> collectShotSnapshots(
+            EntityLivingBase shooter,
+            long timestamp
+    ) {
+        java.util.List<TargetSnapshots> result = new java.util.ArrayList<>();
+
+        for (ClientShotSnapshotCollector.ClientTargetSnapshots target
+                : ClientShotSnapshotCollector.collect(shooter, timestamp)) {
+
+            java.util.List<Snapshot> snapshots = new java.util.ArrayList<>();
+
+            for (com.cheba.combat.client.ClientRenderedPlayerHistory.RenderedPlayerSnapshot
+                    snapshot : target.getSnapshots()) {
+
+                snapshots.add(new Snapshot(
+                        snapshot.getTimestampNanos(),
+                        snapshot.getBoundingBox()
+                ));
+            }
+
+            if (snapshots.isEmpty()) {
+                continue;
+            }
+
+            com.cheba.combat.client.ClientTrackingSequenceManager.TrackingSequence
+                    sequence = com.cheba.combat.client.ClientTrackingSequenceManager
+                    .get(target.getEntityId());
+
+            if (sequence == null) {
+                continue;
+            }
+
+            result.add(new TargetSnapshots(
+                    target.getEntityId(),
+                    sequence.getEpoch(),
+                    sequence.getSequence(),
+                    snapshots
+            ));
+        }
+
+        return result;
     }
 
     private void ejectSpentRound(PlayerWeaponInstance weaponInstance) {

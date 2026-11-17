@@ -21,17 +21,15 @@ public final class ClientRenderedPlayerHistory {
     private ClientRenderedPlayerHistory() {
     }
 
-    public static void record(
+    public static synchronized void record(
             int entityId,
             long epoch,
             int sequence,
             long timestampNanos,
             AxisAlignedBB boundingBox
     ) {
-        if (entityId < 0
-                || epoch <= 0L
-                || sequence < 0
-                || boundingBox == null) {
+        if (entityId < 0 || epoch <= 0L || sequence < 0
+                || timestampNanos <= 0L || boundingBox == null) {
             return;
         }
 
@@ -64,21 +62,25 @@ public final class ClientRenderedPlayerHistory {
         }
     }
 
-    public static List<RenderedPlayerSnapshot> getSnapshots(int entityId) {
+    public static synchronized List<RenderedPlayerSnapshot> getSnapshots(
+            int entityId
+    ) {
         Deque<RenderedPlayerSnapshot> snapshots = HISTORY.get(entityId);
 
-        if (snapshots == null || snapshots.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        return new ArrayList<>(snapshots);
+        return snapshots == null
+                ? new ArrayList<>()
+                : new ArrayList<>(snapshots);
     }
 
-    public static void remove(int entityId) {
+    public static synchronized List<Integer> getEntityIds() {
+        return new ArrayList<>(HISTORY.keySet());
+    }
+
+    public static synchronized void remove(int entityId) {
         HISTORY.remove(entityId);
     }
 
-    public static void pruneStale(long nowNanos) {
+    public static synchronized void pruneStale(long nowNanos) {
         Iterator<Map.Entry<Integer, Deque<RenderedPlayerSnapshot>>> iterator =
                 HISTORY.entrySet().iterator();
 
@@ -94,7 +96,7 @@ public final class ClientRenderedPlayerHistory {
         }
     }
 
-    public static void clear() {
+    public static synchronized void clear() {
         HISTORY.clear();
     }
 
@@ -105,12 +107,8 @@ public final class ClientRenderedPlayerHistory {
         while (!snapshots.isEmpty()) {
             RenderedPlayerSnapshot oldest = snapshots.peekFirst();
 
-            boolean tooOld =
-                    nowNanos - oldest.getTimestampNanos() > MAX_AGE_NANOS;
-
-            boolean tooMany = snapshots.size() > MAX_SNAPSHOTS;
-
-            if (!tooOld && !tooMany) {
+            if (nowNanos - oldest.getTimestampNanos() <= MAX_AGE_NANOS
+                    && snapshots.size() <= MAX_SNAPSHOTS) {
                 break;
             }
 
@@ -126,7 +124,7 @@ public final class ClientRenderedPlayerHistory {
         private final long timestampNanos;
         private final AxisAlignedBB boundingBox;
 
-        private RenderedPlayerSnapshot(
+        public RenderedPlayerSnapshot(
                 int entityId,
                 long epoch,
                 int sequence,
