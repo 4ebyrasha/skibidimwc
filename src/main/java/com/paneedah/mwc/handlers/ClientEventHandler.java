@@ -72,8 +72,9 @@ public class ClientEventHandler {
             return;
         }
 
+        ClientRenderedPlayerHistory.pruneStale(System.nanoTime());
+
         if (MC.player == null || MC.world == null) {
-            ClientRenderedPlayerHistory.pruneStale(System.nanoTime());
             clockSyncTicks = CLOCK_SYNC_INTERVAL_TICKS;
             return;
         }
