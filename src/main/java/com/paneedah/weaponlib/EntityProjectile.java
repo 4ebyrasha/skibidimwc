@@ -292,6 +292,41 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         if (movingobjectposition != null) {
+            if (!world.isRemote) {
+                String hitDescription;
+
+                if (movingobjectposition.entityHit != null) {
+                    Entity hitEntity = movingobjectposition.entityHit;
+
+                    hitDescription = "Type=ENTITY"
+                            + " | Target=" + hitEntity.getUniqueID()
+                            + " | TargetEntityId=" + hitEntity.getEntityId()
+                            + " | TargetClass=" + hitEntity.getClass().getSimpleName();
+                } else if (movingobjectposition.getBlockPos() != null) {
+                    hitDescription = "Type=BLOCK"
+                            + " | Block=" + movingobjectposition.getBlockPos()
+                            + " | BlockState="
+                            + world.getBlockState(movingobjectposition.getBlockPos());
+                } else {
+                    hitDescription = "Type=" + movingobjectposition.typeOfHit;
+                }
+
+                CombatLog.debug(
+                        "EntityProjectile",
+                        "onUpdate",
+                        "Projectile impact"
+                                + " | Projectile=" + getUniqueID()
+                                + " | EntityId=" + getEntityId()
+                                + " | Shooter=" + (shooter == null
+                                ? "null"
+                                : shooter.getUniqueID())
+                                + " | HitX=" + movingobjectposition.hitVec.x
+                                + " | HitY=" + movingobjectposition.hitVec.y
+                                + " | HitZ=" + movingobjectposition.hitVec.z
+                                + " | " + hitDescription
+                );
+            }
+
             this.onImpact(movingobjectposition);
         }
 

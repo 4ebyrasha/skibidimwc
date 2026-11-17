@@ -41,8 +41,8 @@ public final class CombatLog {
     private static final int BACKUP_COUNT = 3;
 
     private static volatile boolean infoEnabled = true;
-    private static volatile boolean debugEnabled;
-    private static volatile boolean traceEnabled;
+    private static volatile boolean debugEnabled = true;
+    private static volatile boolean traceEnabled = true;
 
     private static volatile String sessionId =
             UUID.randomUUID().toString().substring(0, 8);
