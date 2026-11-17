@@ -1056,6 +1056,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                         shooterState.getY() + shooterState.getEyeHeight(),
                         shooterState.getZ()
                 );
+                shotYaw = shooterState.getYaw();
+                shotPitch = shooterState.getPitch();
 
                 historicalOriginAvailable = true;
                 projectileTimelineTimestampNanos =
@@ -1175,6 +1177,17 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                     shotPitch,
                     projectileOrigin
             );
+
+            /*
+             * Never use client-submitted rotation as the authoritative
+             * projectile direction.
+             *
+             * Start with the latest rotation accepted by the server.
+             * If historical shooter state is available, it replaces this
+             * direction with the rotation from the original shot timeline.
+             */
+            shotYaw = player.rotationYaw;
+            shotPitch = player.rotationPitch;
 
             /*
              * Register the projectile before simulating elapsed ticks.
