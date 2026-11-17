@@ -686,6 +686,80 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         return nearestHit;
     }
 
+    private Vec3d getViewerOffset(
+            EntityPlayerMP player,
+            PlayerSnapshot liveEndpoint
+    ) {
+        if (player == null || viewerSnapshots.isEmpty()) {
+            return Vec3d.ZERO;
+        }
+
+        EntityLivingBase shooter = getThrower();
+
+        if (!(shooter instanceof EntityPlayerMP)) {
+            return Vec3d.ZERO;
+        }
+
+        for (ViewerSnapshotValidator.ValidatedTarget target
+                : viewerSnapshots) {
+
+            if (target == null
+                    || !player.getUniqueID().equals(target.getTargetId())
+                    || player.getEntityId() != target.getEntityId()
+                    || target.getSnapshots().isEmpty()) {
+                continue;
+            }
+
+            List<ViewerSnapshotValidator.ValidatedSnapshot> snapshots =
+                    target.getSnapshots();
+
+            ViewerSnapshotValidator.ValidatedSnapshot latest =
+                    snapshots.get(snapshots.size() - 1);
+
+            HistoricalPlayerState serverState =
+                    liveEndpoint != null
+                            ? CombatHistoryManager.getHistoricalState(
+                            player.getUniqueID(),
+                            latest.getTimestampNanos(),
+                            liveEndpoint
+                    )
+                            : CombatHistoryManager.getHistoricalState(
+                            player.getUniqueID(),
+                            latest.getTimestampNanos()
+                    );
+
+            if (!isValidHistoricalState(player, serverState)) {
+                return Vec3d.ZERO;
+            }
+
+            AxisAlignedBB viewerBox = latest.getBoundingBox();
+            AxisAlignedBB serverBox = serverState.getBoundingBox();
+
+            double offsetX =
+                    (viewerBox.minX + viewerBox.maxX) * 0.5D
+                            - (serverBox.minX + serverBox.maxX) * 0.5D;
+
+            double offsetY = viewerBox.minY - serverBox.minY;
+
+            double offsetZ =
+                    (viewerBox.minZ + viewerBox.maxZ) * 0.5D
+                            - (serverBox.minZ + serverBox.maxZ) * 0.5D;
+
+            if (Double.isNaN(offsetX)
+                    || Double.isNaN(offsetY)
+                    || Double.isNaN(offsetZ)
+                    || Double.isInfinite(offsetX)
+                    || Double.isInfinite(offsetY)
+                    || Double.isInfinite(offsetZ)) {
+                return Vec3d.ZERO;
+            }
+
+            return new Vec3d(offsetX, offsetY, offsetZ);
+        }
+
+        return Vec3d.ZERO;
+    }
+
 
     /**
      * Finds an intersection between a projectile segment and a player
@@ -740,6 +814,12 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         if (!isValidHistoricalState(player, midpointState)) {
             return null;
         }
+
+        /*
+         * Calculate the difference between the target position rendered
+         * to the shooter and the authoritative server position.
+         */
+        Vec3d viewerOffset = getViewerOffset(player, liveEndpoint);
 
         HistoricalPlayerState startState =
                 liveEndpoint != null
@@ -813,17 +893,18 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         /*
-         * At the edge of retained history one boundary may be unavailable
-         * even though the midpoint is valid.
-         *
-         * Use the midpoint hitbox for this segment rather than silently
-         * skipping the player or extrapolating an unknown position.
+         * If one boundary is unavailable, use the midpoint hitbox.
+         * Apply the same viewer correction to it.
          */
         if (!isValidHistoricalState(player, startState)
                 || !isValidHistoricalState(player, endState)) {
 
             AxisAlignedBB fallbackBox =
-                    midpointState.getBoundingBox().grow(0.15D);
+                    midpointState.getBoundingBox().offset(
+                            viewerOffset.x,
+                            viewerOffset.y,
+                            viewerOffset.z
+                    ).grow(0.15D);
 
             RayTraceResult fallbackHit =
                     fallbackBox.calculateIntercept(start, end);
@@ -836,7 +917,8 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
         }
 
         /*
-         * Calculate target displacement during this projectile segment.
+         * The same positional offset is applied to both historical
+         * boundaries. Target movement remains server-authoritative.
          */
         Vec3d targetMotion = new Vec3d(
                 endState.getX() - startState.getX(),
@@ -844,13 +926,20 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 endState.getZ() - startState.getZ()
         );
 
-        AxisAlignedBB startBox = startState.getBoundingBox();
-        AxisAlignedBB endBox = endState.getBoundingBox();
+        AxisAlignedBB startBox =
+                startState.getBoundingBox().offset(
+                        viewerOffset.x,
+                        viewerOffset.y,
+                        viewerOffset.z
+                );
 
-        /*
-         * Transform the ending box into the starting target coordinate frame.
-         * The union also accounts for changes in player bounding-box dimensions.
-         */
+        AxisAlignedBB endBox =
+                endState.getBoundingBox().offset(
+                        viewerOffset.x,
+                        viewerOffset.y,
+                        viewerOffset.z
+                );
+
         AxisAlignedBB relativeEndBox = endBox.offset(
                 -targetMotion.x,
                 -targetMotion.y,
@@ -866,10 +955,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 Math.max(startBox.maxZ, relativeEndBox.maxZ)
         ).grow(0.15D);
 
-        /*
-         * In relative coordinates the target is stationary,
-         * while the projectile receives the opposite target displacement.
-         */
         Vec3d relativeEnd = end.subtract(targetMotion);
 
         RayTraceResult relativeHit =
@@ -886,9 +971,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             return null;
         }
 
-        /*
-         * Resolve the collision progress along the relative segment.
-         */
         double progress = relativeHit.hitVec
                 .subtract(start)
                 .dotProduct(relativeSegment)
@@ -898,9 +980,6 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
             return null;
         }
 
-        /*
-         * Convert the relative intersection back into world coordinates.
-         */
         Vec3d worldHit = start.add(
                 end.subtract(start).scale(progress)
         );
