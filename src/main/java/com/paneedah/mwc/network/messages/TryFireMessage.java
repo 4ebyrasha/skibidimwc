@@ -37,11 +37,11 @@ public final class TryFireMessage implements IMessage {
     public TryFireMessage(
             boolean isBurst,
             boolean isAimed,
-            long clientShotTimestampNanos
+            long timestamp
     ) {
         this.isBurst = isBurst;
         this.isAimed = isAimed;
-        this.clientShotTimestampNanos = clientShotTimestampNanos;
+        this.clientShotTimestampNanos = timestamp;
         this.hasClientShotTimestamp = true;
     }
 
@@ -93,6 +93,7 @@ public final class TryFireMessage implements IMessage {
 
         clientShotTimestampNanos = 0L;
         hasClientShotTimestamp = false;
+
         shotYaw = 0.0F;
         shotPitch = 0.0F;
         hasShotDirection = false;
@@ -123,12 +124,17 @@ public final class TryFireMessage implements IMessage {
                     new ArrayList<>(targetCount);
 
             for (int i = 0; i < targetCount; i++) {
+                if (buf.readableBytes() < 13) {
+                    throw new IllegalStateException(
+                            "Incomplete viewer snapshot target"
+                    );
+                }
+
                 int entityId = buf.readInt();
                 long epoch = buf.readLong();
-                int sequence = buf.readInt();
                 int snapshotCount = buf.readUnsignedByte();
 
-                if (entityId < 0 || epoch <= 0L || sequence < 0
+                if (entityId < 0 || epoch <= 0L
                         || snapshotCount == 0
                         || snapshotCount > MAX_SNAPSHOTS_PER_TARGET) {
                     throw new IllegalStateException(
@@ -140,6 +146,13 @@ public final class TryFireMessage implements IMessage {
                         new ArrayList<>(snapshotCount);
 
                 for (int j = 0; j < snapshotCount; j++) {
+                    if (buf.readableBytes() < 60) {
+                        throw new IllegalStateException(
+                                "Incomplete viewer snapshot"
+                        );
+                    }
+
+                    int sequence = buf.readInt();
                     long timestamp = buf.readLong();
 
                     AxisAlignedBB box = new AxisAlignedBB(
@@ -151,19 +164,23 @@ public final class TryFireMessage implements IMessage {
                             buf.readDouble()
                     );
 
-                    if (!isValidBox(box)) {
+                    if (sequence < 0 || timestamp <= 0L
+                            || !isValidBox(box)) {
                         throw new IllegalStateException(
-                                "Invalid viewer snapshot bounding box"
+                                "Invalid viewer snapshot"
                         );
                     }
 
-                    snapshots.add(new Snapshot(timestamp, box));
+                    snapshots.add(new Snapshot(
+                            sequence,
+                            timestamp,
+                            box
+                    ));
                 }
 
                 targets.add(new TargetSnapshots(
                         entityId,
                         epoch,
-                        sequence,
                         snapshots
                 ));
             }
@@ -202,7 +219,6 @@ public final class TryFireMessage implements IMessage {
 
             buf.writeInt(target.entityId);
             buf.writeLong(target.epoch);
-            buf.writeInt(target.sequence);
 
             int count = Math.min(
                     target.snapshots.size(),
@@ -213,9 +229,9 @@ public final class TryFireMessage implements IMessage {
 
             for (int j = 0; j < count; j++) {
                 Snapshot snapshot = target.snapshots.get(j);
-
                 AxisAlignedBB box = snapshot.boundingBox;
 
+                buf.writeInt(snapshot.sequence);
                 buf.writeLong(snapshot.timestampNanos);
 
                 buf.writeDouble(box.minX);
@@ -244,19 +260,18 @@ public final class TryFireMessage implements IMessage {
 
         private final int entityId;
         private final long epoch;
-        private final int sequence;
         private final List<Snapshot> snapshots;
 
         public TargetSnapshots(
                 int entityId,
                 long epoch,
-                int sequence,
                 List<Snapshot> snapshots
         ) {
             this.entityId = entityId;
             this.epoch = epoch;
-            this.sequence = sequence;
-            this.snapshots = snapshots;
+            this.snapshots = snapshots == null
+                    ? Collections.emptyList()
+                    : new ArrayList<>(snapshots);
         }
 
         public int getEntityId() {
@@ -267,10 +282,6 @@ public final class TryFireMessage implements IMessage {
             return epoch;
         }
 
-        public int getSequence() {
-            return sequence;
-        }
-
         public List<Snapshot> getSnapshots() {
             return snapshots;
         }
@@ -278,12 +289,22 @@ public final class TryFireMessage implements IMessage {
 
     public static final class Snapshot {
 
+        private final int sequence;
         private final long timestampNanos;
         private final AxisAlignedBB boundingBox;
 
-        public Snapshot(long timestampNanos, AxisAlignedBB boundingBox) {
+        public Snapshot(
+                int sequence,
+                long timestampNanos,
+                AxisAlignedBB boundingBox
+        ) {
+            this.sequence = sequence;
             this.timestampNanos = timestampNanos;
             this.boundingBox = boundingBox;
+        }
+
+        public int getSequence() {
+            return sequence;
         }
 
         public long getTimestampNanos() {

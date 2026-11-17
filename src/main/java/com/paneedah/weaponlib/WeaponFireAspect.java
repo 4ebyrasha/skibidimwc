@@ -1,5 +1,7 @@
 package com.paneedah.weaponlib;
 
+import com.cheba.combat.client.ClientRenderedPlayerHistory;
+import com.cheba.combat.client.ClientTrackingSequenceManager;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
 import com.paneedah.mwc.instancing.Tags;
@@ -628,10 +630,11 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
             java.util.List<Snapshot> snapshots = new java.util.ArrayList<>();
 
-            for (com.cheba.combat.client.ClientRenderedPlayerHistory.RenderedPlayerSnapshot
-                    snapshot : target.getSnapshots()) {
+            for (ClientRenderedPlayerHistory.RenderedPlayerSnapshot snapshot
+                    : target.getSnapshots()) {
 
                 snapshots.add(new Snapshot(
+                        snapshot.getSequence(),
                         snapshot.getTimestampNanos(),
                         snapshot.getBoundingBox()
                 ));
@@ -641,9 +644,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 continue;
             }
 
-            com.cheba.combat.client.ClientTrackingSequenceManager.TrackingSequence
-                    sequence = com.cheba.combat.client.ClientTrackingSequenceManager
-                    .get(target.getEntityId());
+            ClientTrackingSequenceManager.TrackingSequence sequence =
+                    ClientTrackingSequenceManager.get(target.getEntityId());
 
             if (sequence == null) {
                 continue;
@@ -652,7 +654,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             result.add(new TargetSnapshots(
                     target.getEntityId(),
                     sequence.getEpoch(),
-                    sequence.getSequence(),
                     snapshots
             ));
         }

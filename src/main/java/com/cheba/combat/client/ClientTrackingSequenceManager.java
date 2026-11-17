@@ -11,7 +11,7 @@ public final class ClientTrackingSequenceManager {
     private ClientTrackingSequenceManager() {
     }
 
-    public static void accept(
+    public static synchronized void accept(
             int entityId,
             long epoch,
             int sequence
@@ -43,16 +43,16 @@ public final class ClientTrackingSequenceManager {
         );
     }
 
-    public static TrackingSequence get(int entityId) {
+    public static synchronized TrackingSequence get(int entityId) {
         return SEQUENCES.get(entityId);
     }
 
-    public static void remove(int entityId) {
+    public static synchronized void remove(int entityId) {
         SEQUENCES.remove(entityId);
         ClientRenderedPlayerHistory.remove(entityId);
     }
 
-    public static void clear() {
+    public static synchronized void clear() {
         SEQUENCES.clear();
         ClientRenderedPlayerHistory.clear();
     }
