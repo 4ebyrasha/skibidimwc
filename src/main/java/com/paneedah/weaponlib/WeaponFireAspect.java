@@ -736,6 +736,35 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
     }
 
+    public void serverFire(
+            EntityLivingBase player,
+            boolean isBurst,
+            boolean isAimed,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch,
+            long serverShotTimestampNanos,
+            List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots
+    ) {
+        if (player == null) {
+            return;
+        }
+
+        serverFire(
+                player,
+                player.getHeldItemMainhand(),
+                null,
+                isBurst,
+                isAimed,
+                1.0F,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch,
+                serverShotTimestampNanos,
+                viewerSnapshots
+        );
+    }
+
     public void serverFire(EntityLivingBase player, ItemStack itemStack, BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith, boolean isBurst, boolean isAimed, float damageMultiplier) {
         serverFire(
                 player,
@@ -851,6 +880,10 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
 
         if (player.world == null || player.world.isRemote || player.isDead) {
             return;
+        }
+
+        if (viewerSnapshots == null) {
+            viewerSnapshots = Collections.emptyList();
         }
 
         final long serverReceiveTimestampNanos = System.nanoTime();
