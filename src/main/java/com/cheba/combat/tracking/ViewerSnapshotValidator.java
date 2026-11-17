@@ -1,5 +1,6 @@
 package com.cheba.combat.tracking;
 
+import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.TryFireMessage;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -44,8 +45,8 @@ public final class ViewerSnapshotValidator {
                 || observer.world.isRemote
                 || submitted == null
                 || submitted.isEmpty()
-                || clientShotTimestampNanos <= 0L
-                || serverShotTimestampNanos <= 0L) {
+                || serverShotTimestampNanos
+                == CombatClockSyncManager.NO_ESTIMATE) {
             return Collections.emptyList();
         }
 
@@ -101,12 +102,11 @@ public final class ViewerSnapshotValidator {
             List<ViewerTrackingManager.SentState> states =
                     new ArrayList<>(sentStates);
 
-            List<ValidatedSnapshot> accepted =
-                    new ArrayList<>();
+            List<ValidatedSnapshot> accepted = new ArrayList<>();
 
             long previousClientTimestamp = 0L;
             int previousSequence = -1;
-
+            boolean hasPreviousTimestamp = false;
             boolean invalidSequence = false;
 
             for (TryFireMessage.Snapshot snapshot
@@ -121,15 +121,27 @@ public final class ViewerSnapshotValidator {
                 long clientTimestamp = snapshot.getTimestampNanos();
                 int sequence = snapshot.getSequence();
 
-                /*
-                 * Snapshots must describe a strictly increasing timeline.
-                 * Equal timestamps or sequences are ambiguous and rejected.
-                 */
-                if (clientTimestamp <= previousClientTimestamp
-                        || sequence <= previousSequence
-                        || clientTimestamp > clientShotTimestampNanos
-                        || clientShotTimestampNanos - clientTimestamp
-                        > MAX_REWIND_NANOS) {
+                if ((hasPreviousTimestamp
+                        && clientTimestamp <= previousClientTimestamp)
+                        || sequence <= previousSequence) {
+                    invalidSequence = true;
+                    break;
+                }
+
+                long snapshotAge;
+
+                try {
+                    snapshotAge = Math.subtractExact(
+                            clientShotTimestampNanos,
+                            clientTimestamp
+                    );
+                } catch (ArithmeticException exception) {
+                    invalidSequence = true;
+                    break;
+                }
+
+                if (snapshotAge < 0L
+                        || snapshotAge > MAX_REWIND_NANOS) {
                     invalidSequence = true;
                     break;
                 }
@@ -160,13 +172,14 @@ public final class ViewerSnapshotValidator {
                     break;
                 }
 
-                long snapshotAge =
-                        clientShotTimestampNanos - clientTimestamp;
+                long serverTimestamp;
 
-                long serverTimestamp =
-                        serverShotTimestampNanos - snapshotAge;
-
-                if (serverTimestamp <= 0L) {
+                try {
+                    serverTimestamp = Math.subtractExact(
+                            serverShotTimestampNanos,
+                            snapshotAge
+                    );
+                } catch (ArithmeticException exception) {
                     invalidSequence = true;
                     break;
                 }
@@ -179,13 +192,11 @@ public final class ViewerSnapshotValidator {
 
                 previousClientTimestamp = clientTimestamp;
                 previousSequence = sequence;
+                hasPreviousTimestamp = true;
             }
 
-            /*
-             * Do not salvage part of a malformed target timeline.
-             * Either every submitted snapshot is valid, or the target is rejected.
-             */
-            if (invalidSequence || accepted.size() != targetData.getSnapshots().size()) {
+            if (invalidSequence
+                    || accepted.size() != targetData.getSnapshots().size()) {
                 continue;
             }
 

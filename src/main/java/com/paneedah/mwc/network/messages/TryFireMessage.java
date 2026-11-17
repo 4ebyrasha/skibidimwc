@@ -164,8 +164,7 @@ public final class TryFireMessage implements IMessage {
                             buf.readDouble()
                     );
 
-                    if (sequence < 0 || timestamp <= 0L
-                            || !isValidBox(box)) {
+                    if (sequence < 0 || !isValidBox(box)) {
                         throw new IllegalStateException(
                                 "Invalid viewer snapshot"
                         );
