@@ -38,12 +38,58 @@ public final class TryFireMessageHandler
 
         NetworkUtil.processMessage(context, () -> {
             if (message == null || context.getServerHandler() == null) {
+                CombatLog.debug(
+                        "TryFireMessageHandler",
+                        "onMessage",
+                        "Fire request ignored: missing message or server handler"
+                );
                 return;
             }
 
             EntityPlayerMP player = context.getServerHandler().player;
 
-            if (player == null || player.isDead || fireManager == null) {
+            if (player == null) {
+                CombatLog.debug(
+                        "TryFireMessageHandler",
+                        "onMessage",
+                        "Fire request ignored: server player is null"
+                );
+                return;
+            }
+
+            UUID playerId = player.getUniqueID();
+
+            CombatLog.debug(
+                    "TryFireMessageHandler",
+                    "onMessage",
+                    "Fire request received"
+                            + " | Player=" + playerId
+                            + " | EntityId=" + player.getEntityId()
+                            + " | Dead=" + player.isDead
+                            + " | Burst=" + message.isBurst()
+                            + " | Aimed=" + message.isAimed()
+                            + " | HasClientTimestamp="
+                            + message.hasClientShotTimestamp()
+                            + " | HasShotDirection="
+                            + message.hasShotDirection()
+                            + " | SubmittedTargets="
+                            + (message.getTargetSnapshots() == null
+                            ? 0
+                            : message.getTargetSnapshots().size())
+                            + " | ServerReceiveNanos="
+                            + serverPacketReceiveNanos
+            );
+
+            if (player.isDead || fireManager == null) {
+                CombatLog.debug(
+                        "TryFireMessageHandler",
+                        "onMessage",
+                        "Fire request rejected"
+                                + " | Player=" + playerId
+                                + " | Dead=" + player.isDead
+                                + " | FireManagerAvailable="
+                                + (fireManager != null)
+                );
                 return;
             }
 
@@ -55,12 +101,10 @@ public final class TryFireMessageHandler
                         "TryFireMessageHandler",
                         "onMessage",
                         "Fire request rejected: no weapon in main hand"
-                                + " | Player=" + player.getUniqueID()
+                                + " | Player=" + playerId
                 );
                 return;
             }
-
-            UUID playerId = player.getUniqueID();
 
             boolean hasClientTimestamp =
                     message.hasClientShotTimestamp();
@@ -103,6 +147,7 @@ public final class TryFireMessageHandler
 
             float shotYaw = player.rotationYaw;
             float shotPitch = player.rotationPitch;
+            boolean acceptedClientDirection = false;
 
             if (message.hasShotDirection()) {
                 float clientYaw = message.getShotYaw();
@@ -114,7 +159,19 @@ public final class TryFireMessageHandler
                         && clientPitch <= 90.0F) {
                     shotYaw = MathHelper.wrapDegrees(clientYaw);
                     shotPitch = clientPitch;
+                    acceptedClientDirection = true;
                 }
+
+                CombatLog.debug(
+                        "TryFireMessageHandler",
+                        "onMessage",
+                        "Shot direction received"
+                                + " | Player=" + playerId
+                                + " | ClientYaw=" + clientYaw
+                                + " | ClientPitch=" + clientPitch
+                                + " | DirectionAccepted="
+                                + acceptedClientDirection
+                );
             }
 
             List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots =
@@ -130,29 +187,35 @@ public final class TryFireMessageHandler
             CombatLog.debug(
                     "TryFireMessageHandler",
                     "onMessage",
-                    "Viewer snapshots validated"
+                    "Shot timestamp resolved"
                             + " | Player=" + playerId
-                            + " | SubmittedTargets="
-                            + (message.getTargetSnapshots() == null
-                            ? 0
-                            : message.getTargetSnapshots().size())
-                            + " | AcceptedTargets=" + viewerSnapshots.size()
+                            + " | HasClientTimestamp=" + hasClientTimestamp
                             + " | ClockSynchronized=" + clockSynchronized
+                            + " | ClientShotNanos="
+                            + clientShotTimestampNanos
+                            + " | ServerReceiveNanos="
+                            + serverPacketReceiveNanos
+                            + " | ServerShotNanos="
+                            + serverShotTimestampNanos
+                            + " | RewindMs="
+                            + (serverPacketReceiveNanos
+                            - serverShotTimestampNanos)
+                            / 1_000_000.0D
             );
 
             CombatLog.debug(
                     "TryFireMessageHandler",
                     "onMessage",
-                    "Shot timestamp resolved"
+                    "Viewer snapshot validation completed"
                             + " | Player=" + playerId
-                            + " | HasClientTimestamp=" + hasClientTimestamp
-                            + " | ClockSynchronized=" + clockSynchronized
-                            + " | ClientShotNanos=" + clientShotTimestampNanos
-                            + " | ServerReceiveNanos=" + serverPacketReceiveNanos
-                            + " | ServerShotNanos=" + serverShotTimestampNanos
-                            + " | RewindMs="
-                            + (serverPacketReceiveNanos - serverShotTimestampNanos)
-                            / 1_000_000.0D
+                            + " | SubmittedTargets="
+                            + (message.getTargetSnapshots() == null
+                            ? 0
+                            : message.getTargetSnapshots().size())
+                            + " | AcceptedTargets="
+                            + viewerSnapshots.size()
+                            + " | ClockSynchronized="
+                            + clockSynchronized
             );
 
             fireManager.serverFire(

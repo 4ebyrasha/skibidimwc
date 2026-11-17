@@ -1,5 +1,6 @@
 package com.cheba.combat.client;
 
+import com.cheba.combat.logging.CombatLog;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.fml.relauncher.Side;
@@ -28,10 +29,25 @@ public final class ClientShotSnapshotCollector {
 
         if (shooter == null || shooter.world == null
                 || !shooter.world.isRemote) {
+            CombatLog.debug(
+                    "ClientShotSnapshotCollector",
+                    "collect",
+                    "Snapshot collection skipped: invalid client shooter"
+            );
             return targets;
         }
 
-        for (int entityId : ClientRenderedPlayerHistory.getEntityIds()) {
+        List<Integer> entityIds =
+                ClientRenderedPlayerHistory.getEntityIds();
+
+        int targetsWithHistory = 0;
+        int targetsWithRecentSnapshots = 0;
+
+        long oldestAllowed = shotTimestampNanos < Long.MIN_VALUE + MAX_AGE_NANOS
+                ? Long.MIN_VALUE
+                : shotTimestampNanos - MAX_AGE_NANOS;
+
+        for (int entityId : entityIds) {
             if (entityId == shooter.getEntityId()) {
                 continue;
             }
@@ -43,10 +59,10 @@ public final class ClientShotSnapshotCollector {
                 continue;
             }
 
+            targetsWithHistory++;
+
             List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot> recent =
                     new ArrayList<>();
-
-            long oldestAllowed = shotTimestampNanos - MAX_AGE_NANOS;
 
             for (ClientRenderedPlayerHistory.RenderedPlayerSnapshot snapshot
                     : history) {
@@ -64,6 +80,8 @@ public final class ClientShotSnapshotCollector {
             if (recent.isEmpty()) {
                 continue;
             }
+
+            targetsWithRecentSnapshots++;
 
             List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot> selected =
                     selectSnapshots(recent);
@@ -90,8 +108,75 @@ public final class ClientShotSnapshotCollector {
                 target -> target.distanceSquared
         ));
 
+        int eligibleTargets = targets.size();
+
         if (targets.size() > MAX_TARGETS) {
-            return new ArrayList<>(targets.subList(0, MAX_TARGETS));
+            targets = new ArrayList<>(
+                    targets.subList(0, MAX_TARGETS)
+            );
+        }
+
+        CombatLog.debug(
+                "ClientShotSnapshotCollector",
+                "collect",
+                "Snapshot collection completed"
+                        + " | ShooterEntityId=" + shooter.getEntityId()
+                        + " | ShotTimestampNanos=" + shotTimestampNanos
+                        + " | TrackedEntities=" + entityIds.size()
+                        + " | TargetsWithHistory=" + targetsWithHistory
+                        + " | TargetsWithRecentSnapshots="
+                        + targetsWithRecentSnapshots
+                        + " | EligibleTargets=" + eligibleTargets
+                        + " | SelectedTargets=" + targets.size()
+                        + " | OmittedTargets="
+                        + (eligibleTargets - targets.size())
+        );
+
+        for (ClientTargetSnapshots target : targets) {
+            List<ClientRenderedPlayerHistory.RenderedPlayerSnapshot>
+                    snapshots = target.getSnapshots();
+
+            ClientRenderedPlayerHistory.RenderedPlayerSnapshot latest =
+                    snapshots.get(snapshots.size() - 1);
+
+            CombatLog.trace(
+                    "ClientShotSnapshotCollector",
+                    "collect",
+                    "Selected target"
+                            + " | EntityId=" + target.getEntityId()
+                            + " | SnapshotCount=" + snapshots.size()
+                            + " | LatestEpoch=" + latest.getEpoch()
+                            + " | LatestSequence=" + latest.getSequence()
+                            + " | LatestAgeMs="
+                            + (shotTimestampNanos
+                            - latest.getTimestampNanos()) / 1_000_000.0D
+                            + " | Distance=" + Math.sqrt(target.distanceSquared)
+            );
+
+            for (ClientRenderedPlayerHistory.RenderedPlayerSnapshot snapshot
+                    : snapshots) {
+
+                AxisAlignedBB box = snapshot.getBoundingBox();
+
+                CombatLog.trace(
+                        "ClientShotSnapshotCollector",
+                        "collect",
+                        "Submitted snapshot"
+                                + " | EntityId=" + snapshot.getEntityId()
+                                + " | Epoch=" + snapshot.getEpoch()
+                                + " | Sequence=" + snapshot.getSequence()
+                                + " | TimestampNanos="
+                                + snapshot.getTimestampNanos()
+                                + " | AgeMs="
+                                + (shotTimestampNanos
+                                - snapshot.getTimestampNanos())
+                                / 1_000_000.0D
+                                + " | AABB="
+                                + box.minX + "," + box.minY + "," + box.minZ
+                                + " -> "
+                                + box.maxX + "," + box.maxY + "," + box.maxZ
+                );
+            }
         }
 
         return targets;
