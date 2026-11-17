@@ -74,7 +74,11 @@ public abstract class EntityTrackerEntryMixin {
         EntityPlayerMP target = (EntityPlayerMP) trackedEntity;
 
         for (EntityPlayerMP observer : trackingPlayers) {
-            ViewerTrackingManager.recordMovement(observer, target);
+            ViewerTrackingManager.recordMovement(
+                    observer,
+                    target,
+                    packet
+            );
         }
     }
 

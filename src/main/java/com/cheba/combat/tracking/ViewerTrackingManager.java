@@ -1,14 +1,16 @@
 package com.cheba.combat.tracking;
 
 import com.cheba.combat.logging.CombatLog;
-import com.paneedah.mwc.MWC;
 import com.cheba.combat.tracking.message.TrackingMarkerMessage;
+import com.paneedah.mwc.MWC;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.server.SPacketEntity;
+import net.minecraft.network.play.server.SPacketEntityTeleport;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -17,6 +19,7 @@ public final class ViewerTrackingManager {
 
     private static final int MAX_STATES = 64;
     private static final long MAX_AGE_NANOS = 2_000_000_000L;
+    private static final double POSITION_SCALE = 4096.0D;
 
     private static final AtomicLong NEXT_EPOCH = new AtomicLong(1L);
 
@@ -51,9 +54,14 @@ public final class ViewerTrackingManager {
                 NEXT_EPOCH.getAndIncrement()
         );
 
-        TRACKING.put(key, state);
+        state.initialize(
+                target.posX,
+                target.posY,
+                target.posZ,
+                System.nanoTime()
+        );
 
-        state.record(target, System.nanoTime());
+        TRACKING.put(key, state);
 
         sendMarker(observer, state);
 
@@ -69,9 +77,10 @@ public final class ViewerTrackingManager {
 
     public static void recordMovement(
             EntityPlayerMP observer,
-            EntityPlayerMP target
+            EntityPlayerMP target,
+            Packet<?> packet
     ) {
-        if (!isValidPair(observer, target)) {
+        if (!isValidPair(observer, target) || packet == null) {
             return;
         }
 
@@ -85,12 +94,15 @@ public final class ViewerTrackingManager {
         if (state == null
                 || state.getEntityId() != target.getEntityId()
                 || state.getDimension() != target.dimension) {
+
             stopTracking(observer.getUniqueID(), target.getUniqueID());
             startTracking(observer, target);
             return;
         }
 
-        state.record(target, System.nanoTime());
+        if (!state.applyMovement(packet, System.nanoTime())) {
+            return;
+        }
 
         sendMarker(observer, state);
     }
@@ -172,8 +184,13 @@ public final class ViewerTrackingManager {
                 && observer != target
                 && !observer.isDead
                 && !target.isDead
+                && observer.world != null
                 && observer.world == target.world
                 && !observer.world.isRemote;
+    }
+
+    private static double quantizePosition(double position) {
+        return Math.floor(position * POSITION_SCALE) / POSITION_SCALE;
     }
 
     public static final class ViewerTrackingState {
@@ -187,6 +204,10 @@ public final class ViewerTrackingManager {
         private final Deque<SentState> sentStates = new ArrayDeque<>();
 
         private int sequence;
+
+        private double x;
+        private double y;
+        private double z;
 
         private ViewerTrackingState(
                 UUID observerId,
@@ -202,29 +223,74 @@ public final class ViewerTrackingManager {
             this.epoch = epoch;
         }
 
-        private void record(
-                EntityPlayerMP target,
+        private void initialize(
+                double x,
+                double y,
+                double z,
                 long timestampNanos
         ) {
-            if (sequence == Integer.MAX_VALUE) {
-                throw new IllegalStateException(
-                        "Tracking sequence exhausted"
-                );
-            }
-
-            if (!sentStates.isEmpty()) {
-                sequence++;
-            }
+            this.x = quantizePosition(x);
+            this.y = quantizePosition(y);
+            this.z = quantizePosition(z);
 
             sentStates.addLast(new SentState(
                     sequence,
                     timestampNanos,
-                    target.posX,
-                    target.posY,
-                    target.posZ
+                    this.x,
+                    this.y,
+                    this.z
+            ));
+        }
+
+        private boolean applyMovement(
+                Packet<?> packet,
+                long timestampNanos
+        ) {
+            if (sequence == Integer.MAX_VALUE) {
+                CombatLog.warn(
+                        "ViewerTrackingManager",
+                        "applyMovement",
+                        "Tracking sequence exhausted"
+                                + " | Observer=" + observerId
+                                + " | Target=" + targetId
+                );
+                return false;
+            }
+
+            if (packet instanceof SPacketEntityTeleport) {
+                SPacketEntityTeleport teleport =
+                        (SPacketEntityTeleport) packet;
+
+                x = quantizePosition(teleport.getX());
+                y = quantizePosition(teleport.getY());
+                z = quantizePosition(teleport.getZ());
+
+            } else if (packet instanceof SPacketEntity.S15PacketEntityRelMove
+                    || packet instanceof SPacketEntity.S17PacketEntityLookMove) {
+
+                SPacketEntity movement = (SPacketEntity) packet;
+
+                x += movement.getX() / POSITION_SCALE;
+                y += movement.getY() / POSITION_SCALE;
+                z += movement.getZ() / POSITION_SCALE;
+
+            } else if (!(packet instanceof SPacketEntity.S16PacketEntityLook)) {
+                return false;
+            }
+
+            sequence++;
+
+            sentStates.addLast(new SentState(
+                    sequence,
+                    timestampNanos,
+                    x,
+                    y,
+                    z
             ));
 
             trim(timestampNanos);
+
+            return true;
         }
 
         private void trim(long now) {
