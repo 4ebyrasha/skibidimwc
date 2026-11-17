@@ -123,17 +123,9 @@ public final class ViewerTrackingManager {
             return;
         }
 
-        Iterator<Map.Entry<TrackingKey, ViewerTrackingState>> iterator =
-                TRACKING.entrySet().iterator();
-
-        while (iterator.hasNext()) {
-            Map.Entry<TrackingKey, ViewerTrackingState> entry =
-                    iterator.next();
-
-            if (targetId.equals(entry.getKey().targetId)) {
-                iterator.remove();
-            }
-        }
+        TRACKING.entrySet().removeIf(
+                entry -> targetId.equals(entry.getKey().targetId)
+        );
     }
 
     public static void stopTrackingObserver(UUID observerId) {
@@ -141,17 +133,9 @@ public final class ViewerTrackingManager {
             return;
         }
 
-        Iterator<Map.Entry<TrackingKey, ViewerTrackingState>> iterator =
-                TRACKING.entrySet().iterator();
-
-        while (iterator.hasNext()) {
-            Map.Entry<TrackingKey, ViewerTrackingState> entry =
-                    iterator.next();
-
-            if (observerId.equals(entry.getKey().observerId)) {
-                iterator.remove();
-            }
-        }
+        TRACKING.entrySet().removeIf(
+                entry -> observerId.equals(entry.getKey().observerId)
+        );
     }
 
     public static ViewerTrackingState getState(

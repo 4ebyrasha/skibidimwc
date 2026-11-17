@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.ArrayList;
 import java.util.Set;
 
 @Mixin(EntityTrackerEntry.class)
@@ -74,7 +73,7 @@ public abstract class EntityTrackerEntryMixin {
 
         EntityPlayerMP target = (EntityPlayerMP) trackedEntity;
 
-        for (EntityPlayerMP observer : new ArrayList<>(trackingPlayers)) {
+        for (EntityPlayerMP observer : trackingPlayers) {
             ViewerTrackingManager.recordMovement(observer, target);
         }
     }
