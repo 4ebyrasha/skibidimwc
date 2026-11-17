@@ -1,0 +1,18 @@
+2026-11-17T14:06:47.109Z | nano=25676876826600 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startRecording] Name=1 | Dimension=0 | Position=311.4534051061857,71.0,472.5200947589961
+2026-11-17T14:06:52.005Z | nano=25681772751000 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#finishRecording] Saved=1 | Frames=98 | Reason=manual stop
+2026-11-17T14:07:13.056Z | nano=25702823984000 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:07:21.655Z | nano=25711423611400 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=51 | Reason=player state changed
+2026-11-17T14:07:31.563Z | nano=25721330749400 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:07:40.109Z | nano=25729876832800 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=50 | Reason=player state changed
+2026-11-17T14:07:48.256Z | nano=25738023835000 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:07:59.162Z | nano=25748930441500 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#finishPlayback] Completed=1 | Frames=98
+2026-11-17T14:08:05.910Z | nano=25755677814600 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:08:14.506Z | nano=25764274061100 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=51 | Reason=player state changed
+2026-11-17T14:08:42.204Z | nano=25791971524500 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:08:50.807Z | nano=25800575091200 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=52 | Reason=player state changed
+2026-11-17T14:10:37.752Z | nano=25907519572600 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:10:46.354Z | nano=25916121910300 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=52 | Reason=player state changed
+2026-11-17T14:11:00.459Z | nano=25930226274600 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:11:09.058Z | nano=25938826302600 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=51 | Reason=player state changed
+2026-11-17T14:11:18.512Z | nano=25948280068300 | level=INFO | session=pvp02 | [MWC Combat][MWCReplayController#startPlayback] Name=1 | Frames=98 | DelayMs=6000
+2026-11-17T14:11:27.108Z | nano=25956876235800 | level=WARN | session=pvp02 | [MWC Combat][MWCReplayController#cancelPlayback] Cancelled=1 | Frame=51 | Reason=player state changed
