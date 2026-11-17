@@ -43,16 +43,22 @@ public final class ViewerSnapshotValidator {
                 || observer.world == null
                 || observer.world.isRemote
                 || submitted == null
+                || submitted.isEmpty()
                 || clientShotTimestampNanos <= 0L
                 || serverShotTimestampNanos <= 0L) {
             return Collections.emptyList();
         }
 
         List<ValidatedTarget> result = new ArrayList<>();
+        java.util.Set<Integer> processedEntityIds = new java.util.HashSet<>();
 
         for (TryFireMessage.TargetSnapshots targetData : submitted) {
             if (targetData == null
-                    || targetData.getSnapshots().isEmpty()) {
+                    || targetData.getSnapshots() == null
+                    || targetData.getSnapshots().isEmpty()
+                    || targetData.getSnapshots().size()
+                    > TryFireMessage.MAX_SNAPSHOTS_PER_TARGET
+                    || !processedEntityIds.add(targetData.getEntityId())) {
                 continue;
             }
 
@@ -101,32 +107,38 @@ public final class ViewerSnapshotValidator {
             long previousClientTimestamp = 0L;
             int previousSequence = -1;
 
+            boolean invalidSequence = false;
+
             for (TryFireMessage.Snapshot snapshot
                     : targetData.getSnapshots()) {
 
                 if (snapshot == null
                         || snapshot.getBoundingBox() == null) {
-                    continue;
+                    invalidSequence = true;
+                    break;
                 }
 
-                long clientTimestamp =
-                        snapshot.getTimestampNanos();
-
+                long clientTimestamp = snapshot.getTimestampNanos();
                 int sequence = snapshot.getSequence();
 
-                if (clientTimestamp <= 0L
+                /*
+                 * Snapshots must describe a strictly increasing timeline.
+                 * Equal timestamps or sequences are ambiguous and rejected.
+                 */
+                if (clientTimestamp <= previousClientTimestamp
+                        || sequence <= previousSequence
                         || clientTimestamp > clientShotTimestampNanos
                         || clientShotTimestampNanos - clientTimestamp
-                        > MAX_REWIND_NANOS
-                        || clientTimestamp < previousClientTimestamp
-                        || sequence < previousSequence) {
-                    continue;
+                        > MAX_REWIND_NANOS) {
+                    invalidSequence = true;
+                    break;
                 }
 
                 int stateIndex = findStateIndex(states, sequence);
 
                 if (stateIndex < 0) {
-                    continue;
+                    invalidSequence = true;
+                    break;
                 }
 
                 AxisAlignedBB box = snapshot.getBoundingBox();
@@ -135,7 +147,8 @@ public final class ViewerSnapshotValidator {
                         box,
                         target.getEntityBoundingBox()
                 )) {
-                    continue;
+                    invalidSequence = true;
+                    break;
                 }
 
                 if (!matchesSentTrajectory(
@@ -143,7 +156,8 @@ public final class ViewerSnapshotValidator {
                         states,
                         stateIndex
                 )) {
-                    continue;
+                    invalidSequence = true;
+                    break;
                 }
 
                 long snapshotAge =
@@ -151,6 +165,11 @@ public final class ViewerSnapshotValidator {
 
                 long serverTimestamp =
                         serverShotTimestampNanos - snapshotAge;
+
+                if (serverTimestamp <= 0L) {
+                    invalidSequence = true;
+                    break;
+                }
 
                 accepted.add(new ValidatedSnapshot(
                         sequence,
@@ -162,14 +181,20 @@ public final class ViewerSnapshotValidator {
                 previousSequence = sequence;
             }
 
-            if (!accepted.isEmpty()) {
-                result.add(new ValidatedTarget(
-                        target.getUniqueID(),
-                        target.getEntityId(),
-                        tracking.getEpoch(),
-                        accepted
-                ));
+            /*
+             * Do not salvage part of a malformed target timeline.
+             * Either every submitted snapshot is valid, or the target is rejected.
+             */
+            if (invalidSequence || accepted.size() != targetData.getSnapshots().size()) {
+                continue;
             }
+
+            result.add(new ValidatedTarget(
+                    target.getUniqueID(),
+                    target.getEntityId(),
+                    tracking.getEpoch(),
+                    accepted
+            ));
         }
 
         return result;
