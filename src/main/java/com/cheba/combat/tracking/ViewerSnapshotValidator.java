@@ -1,5 +1,8 @@
 package com.cheba.combat.tracking;
 
+import com.cheba.combat.history.CombatHistoryManager;
+import com.cheba.combat.history.HistoricalPlayerState;
+import com.cheba.combat.history.PlayerSnapshot;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.paneedah.mwc.network.messages.TryFireMessage;
@@ -161,6 +164,31 @@ public final class ViewerSnapshotValidator {
                 continue;
             }
 
+            /*
+             * Capture the current authoritative target state once.
+             * It may be used as a temporary interpolation endpoint when
+             * the requested historical timestamp is newer than the last
+             * persistent history snapshot.
+             */
+            PlayerSnapshot liveEndpoint;
+
+            try {
+                liveEndpoint = new PlayerSnapshot(
+                        target,
+                        System.nanoTime()
+                );
+            } catch (IllegalArgumentException exception) {
+                reject(
+                        observer,
+                        targetData,
+                        "TARGET_LIVE_STATE_INVALID",
+                        exception.getMessage()
+                );
+
+                rejectedTargets++;
+                continue;
+            }
+
             List<ViewerTrackingManager.SentState> states =
                     new ArrayList<>(sentStates);
 
@@ -268,25 +296,6 @@ public final class ViewerSnapshotValidator {
                     break;
                 }
 
-                if (!hasValidDimensions(
-                        box,
-                        target.getEntityBoundingBox()
-                )) {
-                    rejectionReason = "INVALID_AABB_DIMENSIONS";
-                    rejectionDetails = "Sequence=" + sequence;
-                    break;
-                }
-
-                if (!matchesSentTrajectory(
-                        box,
-                        states,
-                        stateIndex
-                )) {
-                    rejectionReason = "SENT_TRAJECTORY_MISMATCH";
-                    rejectionDetails = "Sequence=" + sequence;
-                    break;
-                }
-
                 long serverTimestamp;
 
                 try {
@@ -332,6 +341,64 @@ public final class ViewerSnapshotValidator {
                     rejectionDetails = "Sequence=" + sequence
                             + " | RenderAfterSendMs="
                             + renderAfterSend / 1_000_000.0D;
+                    break;
+                }
+
+                /*
+                 * Resolve the target's authoritative historical state
+                 * at the exact timestamp that will be used by the
+                 * validated snapshot.
+                 */
+                HistoricalPlayerState historicalState =
+                        CombatHistoryManager.getHistoricalState(
+                                target.getUniqueID(),
+                                serverTimestamp,
+                                liveEndpoint
+                        );
+
+                if (historicalState == null) {
+                    String historyReason =
+                            CombatHistoryManager.getHistoricalStateFailureReason(
+                                    target.getUniqueID(),
+                                    serverTimestamp,
+                                    liveEndpoint
+                            );
+
+                    rejectionReason = "HISTORICAL_STATE_UNAVAILABLE";
+                    rejectionDetails = "Sequence=" + sequence
+                            + " | HistoryReason=" + historyReason;
+                    break;
+                }
+
+                if (historicalState.getEntityId() != target.getEntityId()
+                        || historicalState.getDimension() != target.dimension) {
+                    rejectionReason = "HISTORICAL_IDENTITY_MISMATCH";
+                    rejectionDetails = "Sequence=" + sequence
+                            + " | HistoricalEntityId="
+                            + historicalState.getEntityId()
+                            + " | TargetEntityId=" + target.getEntityId()
+                            + " | HistoricalDimension="
+                            + historicalState.getDimension()
+                            + " | TargetDimension=" + target.dimension;
+                    break;
+                }
+
+                if (!hasValidDimensions(
+                        box,
+                        historicalState.getBoundingBox()
+                )) {
+                    rejectionReason = "INVALID_AABB_DIMENSIONS";
+                    rejectionDetails = "Sequence=" + sequence;
+                    break;
+                }
+
+                if (!matchesSentTrajectory(
+                        box,
+                        states,
+                        stateIndex
+                )) {
+                    rejectionReason = "SENT_TRAJECTORY_MISMATCH";
+                    rejectionDetails = "Sequence=" + sequence;
                     break;
                 }
 

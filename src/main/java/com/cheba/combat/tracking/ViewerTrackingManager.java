@@ -196,10 +196,6 @@ public final class ViewerTrackingManager {
         );
     }
 
-    private void markTeleportNextPositionUpdate() {
-        teleportPending = true;
-    }
-
     public static ViewerTrackingState getState(
             UUID observerId,
             UUID targetId

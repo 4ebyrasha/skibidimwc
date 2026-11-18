@@ -371,6 +371,7 @@ public final class MWC {
                 "onServerStopped",
                 "Combat system state cleanup completed"
         );
+        CombatLog.flush();
     }
 
     public static void updateDebugHandler() {

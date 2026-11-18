@@ -16,6 +16,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -38,8 +40,6 @@ public final class CombatLog {
     // 63 MB (decimal). Each active or rotated file has this limit.
     private static final long MAX_FILE_SIZE = 63_000_000L;
 
-    // Keep the active file plus three previous files.
-    private static final int BACKUP_COUNT = 3;
 
     // Avoid synchronous disk flush after every log line.
     private static final int FLUSH_EVERY_LINES = 128;
@@ -260,33 +260,30 @@ public final class CombatLog {
         return new FileState(file, writer, size);
     }
 
-    private static void rotate(FileState state)
-            throws IOException {
-
-        // Closing flushes the old active file before moving it.
+    private static void rotate(FileState state) throws IOException {
         state.writer.close();
         state.writer = null;
 
-        for (int i = BACKUP_COUNT - 1; i >= 1; i--) {
-            Path source = backupPath(state.path, i);
-            Path target = backupPath(state.path, i + 1);
+        String timestamp = DateTimeFormatter
+                .ofPattern("yyyyMMdd-HHmmss-SSS")
+                .withZone(ZoneOffset.UTC)
+                .format(Instant.now());
 
-            if (Files.exists(source)) {
-                Files.move(
-                        source,
-                        target,
-                        StandardCopyOption.REPLACE_EXISTING
-                );
-            }
-        }
+        String baseName = state.path.getFileName().toString();
 
-        if (Files.exists(state.path)) {
-            Files.move(
-                    state.path,
-                    backupPath(state.path, 1),
-                    StandardCopyOption.REPLACE_EXISTING
+        Path archive = state.path.resolveSibling(
+                baseName + "." + timestamp
+        );
+
+        int collision = 1;
+
+        while (Files.exists(archive)) {
+            archive = state.path.resolveSibling(
+                    baseName + "." + timestamp + "." + collision++
             );
         }
+
+        Files.move(state.path, archive);
 
         state.writer = Files.newBufferedWriter(
                 state.path,
@@ -307,12 +304,6 @@ public final class CombatLog {
         state.writer.flush();
         state.pendingLines = 0;
         state.lastFlushNanos = now;
-    }
-
-    private static Path backupPath(Path file, int index) {
-        return file.resolveSibling(
-                file.getFileName().toString() + "." + index
-        );
     }
 
     private static void closeQuietly(BufferedWriter writer) {

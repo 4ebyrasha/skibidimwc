@@ -129,11 +129,6 @@ public abstract class NetHandlerPlayServerMixin {
                 "server_position_correction"
         );
 
-        CombatHistoryManager.invalidate(
-                player.getUniqueID(),
-                "server_position_correction"
-        );
-
         CombatLog.debug(
                 "NetHandlerPlayServerMixin",
                 "invalidateHistoryOnCorrection",
