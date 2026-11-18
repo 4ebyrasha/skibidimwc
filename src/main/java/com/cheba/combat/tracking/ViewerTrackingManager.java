@@ -29,6 +29,25 @@ public final class ViewerTrackingManager {
     private ViewerTrackingManager() {
     }
 
+    /**
+     * Clears all viewer tracking pairs when the logical server stops.
+     *
+     * <p>Must be called from the logical server thread.</p>
+     */
+    public static void clear() {
+        int removedPairs = TRACKING.size();
+
+        TRACKING.clear();
+
+        CombatLog.info(
+                "ViewerTrackingManager",
+                "clear",
+                "All viewer tracking states cleared"
+                        + " | RemovedPairs=" + removedPairs
+                        + " | NextEpoch=" + NEXT_EPOCH.get()
+        );
+    }
+
     public static void startTracking(
             EntityPlayerMP observer,
             EntityPlayerMP target

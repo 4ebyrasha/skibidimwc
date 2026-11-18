@@ -794,9 +794,12 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
      * moving between two historical snapshots.
      *
      * <p>The player's movement is converted into relative projectile
-     * movement. If one of the segment boundary snapshots is unavailable,
-     * the midpoint snapshot is used as a static fallback. No extrapolation
-     * beyond the current authoritative state is performed.</p>
+     * movement. Valid historical snapshots are required at the segment
+     * start, midpoint and end timestamps. If any required state is
+     * unavailable, the historical collision check is skipped.</p>
+     *
+     * <p>No midpoint-only fallback and no extrapolation beyond the
+     * available authoritative history are performed.</p>
      *
      * @param player target player
      * @param start projectile segment start

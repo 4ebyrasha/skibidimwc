@@ -12,7 +12,7 @@ import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
- * Handles combat history recording and lifecycle cleanup.
+ * Handles combat history recording and player lifecycle cleanup.
  */
 public final class CombatHistoryEventHandler {
 
@@ -55,7 +55,8 @@ public final class CombatHistoryEventHandler {
         CombatLog.debug(
                 "CombatHistoryEventHandler",
                 "onPlayerLogout",
-                "Player combat state removed | Player=" + player.getUniqueID()
+                "Player combat state removed"
+                        + " | Player=" + player.getUniqueID()
         );
     }
 
@@ -74,6 +75,54 @@ public final class CombatHistoryEventHandler {
         );
         ViewerTrackingManager.stopTrackingTarget(
                 player.getUniqueID()
+        );
+
+        CombatLog.debug(
+                "CombatHistoryEventHandler",
+                "onPlayerDeath",
+                "Player combat history and tracking removed"
+                        + " | Player=" + player.getUniqueID()
+                        + " | EntityId=" + player.getEntityId()
+        );
+    }
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(
+            PlayerEvent.PlayerRespawnEvent event
+    ) {
+        if (!(event.player instanceof EntityPlayerMP)) {
+            return;
+        }
+
+        EntityPlayerMP player = (EntityPlayerMP) event.player;
+
+        /*
+         * Death normally removes this state already.
+         * Repeat the cleanup here to guarantee that the new player entity
+         * cannot inherit stale tracking pairs or historical snapshots.
+         *
+         * EntityTrackerEntryMixin will create fresh tracking pairs when
+         * the respawned entity starts being tracked by other players.
+         */
+        CombatHistoryManager.invalidate(
+                player.getUniqueID(),
+                "player_respawn"
+        );
+
+        ViewerTrackingManager.stopTrackingObserver(
+                player.getUniqueID()
+        );
+        ViewerTrackingManager.stopTrackingTarget(
+                player.getUniqueID()
+        );
+
+        CombatLog.info(
+                "CombatHistoryEventHandler",
+                "onPlayerRespawn",
+                "Respawn lifecycle cleanup completed"
+                        + " | Player=" + player.getUniqueID()
+                        + " | EntityId=" + player.getEntityId()
+                        + " | Dimension=" + player.dimension
         );
     }
 
@@ -97,6 +146,14 @@ public final class CombatHistoryEventHandler {
         );
         ViewerTrackingManager.stopTrackingTarget(
                 player.getUniqueID()
+        );
+
+        CombatLog.debug(
+                "CombatHistoryEventHandler",
+                "onPlayerChangedDimension",
+                "Player history and tracking invalidated"
+                        + " | Player=" + player.getUniqueID()
+                        + " | Dimension=" + player.dimension
         );
     }
 }

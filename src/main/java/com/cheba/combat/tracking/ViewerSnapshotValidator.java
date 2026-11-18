@@ -521,6 +521,11 @@ public final class ViewerSnapshotValidator {
                 stateIndex - MAX_INTERPOLATION_STATES
         );
 
+        /*
+         * Do not compare snapshots across a teleport.
+         * Preserve the existing behavior: only inspect the trajectory
+         * after the latest teleport in the selected state window.
+         */
         for (int i = firstIndex + 1; i <= stateIndex; i++) {
             if (states.get(i).isTeleport()) {
                 firstIndex = i;
@@ -530,14 +535,50 @@ public final class ViewerSnapshotValidator {
         ViewerTrackingManager.SentState current =
                 states.get(stateIndex);
 
+        /*
+         * When no interpolation segment is available, compare directly
+         * against the current authoritative sent state.
+         */
         if (stateIndex == firstIndex) {
-            return distanceSquared(
+            double distanceSquared = distanceSquared(
                     x, y, z,
                     current.getX(),
                     current.getY(),
                     current.getZ()
-            ) <= toleranceSquared;
+            );
+
+            boolean matches = distanceSquared <= toleranceSquared;
+
+            if (!matches) {
+                CombatLog.trace(
+                        "ViewerSnapshotValidator",
+                        "matchesSentTrajectory",
+                        "Trajectory mismatch"
+                                + " | Mode=SingleState"
+                                + " | Sequence=" + current.getSequence()
+                                + " | StateIndex=" + stateIndex
+                                + " | ClientFoot=" + x + ", " + y + ", " + z
+                                + " | ServerPosition="
+                                + current.getX() + ", "
+                                + current.getY() + ", "
+                                + current.getZ()
+                                + " | Distance="
+                                + Math.sqrt(distanceSquared)
+                                + " | Tolerance=" + POSITION_TOLERANCE
+                );
+            }
+
+            return matches;
         }
+
+        double minimumDistanceSquared = Double.POSITIVE_INFINITY;
+
+        int nearestSegmentIndex = -1;
+        double nearestSegmentLength = 0.0D;
+        double nearestSegmentProgress = 0.0D;
+
+        int candidateSegments = 0;
+        int skippedLongSegments = 0;
 
         for (int i = firstIndex + 1; i <= stateIndex; i++) {
             ViewerTrackingManager.SentState previous =
@@ -556,23 +597,101 @@ public final class ViewerSnapshotValidator {
             if (lengthSquared
                     > MAX_INTERPOLATION_DISTANCE
                     * MAX_INTERPOLATION_DISTANCE) {
+                skippedLongSegments++;
                 continue;
             }
 
-            if (distanceToSegmentSquared(
+            candidateSegments++;
+
+            double progress;
+
+            if (lengthSquared <= 1.0E-12D) {
+                progress = 0.0D;
+            } else {
+                progress = (
+                        (x - previous.getX()) * dx
+                                + (y - previous.getY()) * dy
+                                + (z - previous.getZ()) * dz
+                ) / lengthSquared;
+
+                progress = Math.max(
+                        0.0D,
+                        Math.min(1.0D, progress)
+                );
+            }
+
+            double closestX = previous.getX() + dx * progress;
+            double closestY = previous.getY() + dy * progress;
+            double closestZ = previous.getZ() + dz * progress;
+
+            double distanceSquared = distanceSquared(
                     x, y, z,
-                    previous.getX(),
-                    previous.getY(),
-                    previous.getZ(),
-                    next.getX(),
-                    next.getY(),
-                    next.getZ()
-            ) <= toleranceSquared) {
-                return true;
+                    closestX, closestY, closestZ
+            );
+
+            if (distanceSquared < minimumDistanceSquared) {
+                minimumDistanceSquared = distanceSquared;
+                nearestSegmentIndex = i;
+                nearestSegmentLength = Math.sqrt(lengthSquared);
+                nearestSegmentProgress = progress;
             }
         }
 
-        return false;
+        boolean matches =
+                minimumDistanceSquared <= toleranceSquared;
+
+        if (!matches) {
+            String nearestSegment;
+
+            if (nearestSegmentIndex < 0) {
+                nearestSegment = "none";
+            } else {
+                ViewerTrackingManager.SentState previous =
+                        states.get(nearestSegmentIndex - 1);
+
+                ViewerTrackingManager.SentState next =
+                        states.get(nearestSegmentIndex);
+
+                nearestSegment =
+                        previous.getSequence()
+                                + "->"
+                                + next.getSequence();
+            }
+
+            String minimumDistance =
+                    Double.isInfinite(minimumDistanceSquared)
+                            ? "unavailable"
+                            : String.valueOf(
+                            Math.sqrt(minimumDistanceSquared)
+                    );
+
+            CombatLog.trace(
+                    "ViewerSnapshotValidator",
+                    "matchesSentTrajectory",
+                    "Trajectory mismatch"
+                            + " | Mode=Interpolated"
+                            + " | StateIndex=" + stateIndex
+                            + " | FirstStateIndex=" + firstIndex
+                            + " | CurrentSequence=" + current.getSequence()
+                            + " | FirstSequence="
+                            + states.get(firstIndex).getSequence()
+                            + " | ClientFoot=" + x + ", " + y + ", " + z
+                            + " | NearestSegment=" + nearestSegment
+                            + " | NearestSegmentLength="
+                            + nearestSegmentLength
+                            + " | NearestSegmentProgress="
+                            + nearestSegmentProgress
+                            + " | MinimumDistance=" + minimumDistance
+                            + " | PositionTolerance=" + POSITION_TOLERANCE
+                            + " | CandidateSegments=" + candidateSegments
+                            + " | SkippedLongSegments=" + skippedLongSegments
+                            + " | MaxInterpolationDistance="
+                            + MAX_INTERPOLATION_DISTANCE
+                            + " | AvailableStates=" + states.size()
+            );
+        }
+
+        return matches;
     }
 
     private static double distanceToSegmentSquared(

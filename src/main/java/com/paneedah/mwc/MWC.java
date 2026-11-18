@@ -7,6 +7,7 @@ import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.logging.CombatLogCommand;
 import com.cheba.combat.time.CombatClockSyncManager;
+import com.cheba.combat.tracking.ViewerTrackingManager;
 import com.cheba.combat.tracking.message.TrackingMarkerMessage;
 import com.cheba.combat.tracking.message.TrackingMarkerMessageHandler;
 import com.cheba.effect.BulletSuppressionEffect;
@@ -360,9 +361,16 @@ public final class MWC {
      */
     @Mod.EventHandler
     public void onServerStopped(FMLServerStoppedEvent event) {
+        ViewerTrackingManager.clear();
         CombatHistoryManager.clear();
         CombatClockSyncManager.clear();
         ServerFireRateLimiter.clear();
+
+        CombatLog.info(
+                "MWC",
+                "onServerStopped",
+                "Combat system state cleanup completed"
+        );
     }
 
     public static void updateDebugHandler() {
