@@ -20,6 +20,7 @@ public final class ViewerTrackingManager {
     private static final int MAX_STATES = 64;
     private static final long MAX_AGE_NANOS = 2_000_000_000L;
     private static final double POSITION_SCALE = 4096.0D;
+    private static final double FORCED_TELEPORT_DISPLACEMENT = 2.5D;
 
     private static final AtomicLong NEXT_EPOCH = new AtomicLong(1L);
 
@@ -169,6 +170,36 @@ public final class ViewerTrackingManager {
         );
     }
 
+    public static void markTeleportTarget(UUID targetId) {
+        if (targetId == null) {
+            return;
+        }
+
+        int markedPairs = 0;
+
+        for (Map.Entry<TrackingKey, ViewerTrackingState> entry
+                : TRACKING.entrySet()) {
+
+            if (!targetId.equals(entry.getKey().targetId)) {
+                continue;
+            }
+
+            entry.getValue().markTeleportNextPositionUpdate();
+            markedPairs++;
+        }
+
+        CombatLog.debug(
+                "ViewerTrackingManager",
+                "markTeleportTarget",
+                "Target=" + targetId
+                        + " | MarkedPairs=" + markedPairs
+        );
+    }
+
+    private void markTeleportNextPositionUpdate() {
+        teleportPending = true;
+    }
+
     public static ViewerTrackingState getState(
             UUID observerId,
             UUID targetId
@@ -214,11 +245,16 @@ public final class ViewerTrackingManager {
 
     public static final class ViewerTrackingState {
 
+        private boolean teleportPending;
         private final UUID observerId;
         private final UUID targetId;
         private final int entityId;
         private final int dimension;
         private final long epoch;
+
+        private void markTeleportNextPositionUpdate() {
+            teleportPending = true;
+        }
 
         private final Deque<SentState> sentStates = new ArrayDeque<>();
 
@@ -282,18 +318,58 @@ public final class ViewerTrackingManager {
                 return false;
             }
 
-            boolean teleport = packet instanceof SPacketEntityTeleport;
+            boolean positionChanged =
+                    packet instanceof SPacketEntityTeleport
+                            || packet instanceof SPacketEntity.S15PacketEntityRelMove
+                            || packet instanceof SPacketEntity.S17PacketEntityLookMove;
 
-            boolean positionChanged = teleport
-                    || packet instanceof SPacketEntity.S15PacketEntityRelMove
-                    || packet instanceof SPacketEntity.S17PacketEntityLookMove;
+            if (!positionChanged
+                    && !(packet instanceof SPacketEntity.S16PacketEntityLook)) {
+                return false;
+            }
+
+            double nextX = positionChanged
+                    ? quantizePosition(target.posX)
+                    : x;
+
+            double nextY = positionChanged
+                    ? quantizePosition(target.posY)
+                    : y;
+
+            double nextZ = positionChanged
+                    ? quantizePosition(target.posZ)
+                    : z;
+
+            double dx = nextX - x;
+            double dy = nextY - y;
+            double dz = nextZ - z;
+
+            double displacementSquared =
+                    dx * dx + dy * dy + dz * dz;
+
+            boolean fullTeleportPacket =
+                    packet instanceof SPacketEntityTeleport;
+
+            /*
+             * A full teleport packet alone is not proof of an actual teleport.
+             * Small full-position updates can be normal vanilla synchronization.
+             *
+             * Explicit server corrections are marked through
+             * NetHandlerPlayServerMixin.
+             */
+            boolean actualTeleport = positionChanged
+                    && (teleportPending
+                    || (fullTeleportPacket
+                    && displacementSquared
+                    > FORCED_TELEPORT_DISPLACEMENT
+                    * FORCED_TELEPORT_DISPLACEMENT));
 
             if (positionChanged) {
-                x = quantizePosition(target.posX);
-                y = quantizePosition(target.posY);
-                z = quantizePosition(target.posZ);
-            } else if (!(packet instanceof SPacketEntity.S16PacketEntityLook)) {
-                return false;
+                x = nextX;
+                y = nextY;
+                z = nextZ;
+
+                teleportPending = false;
             }
 
             sequence++;
@@ -304,10 +380,25 @@ public final class ViewerTrackingManager {
                     x,
                     y,
                     z,
-                    teleport
+                    actualTeleport
             ));
 
             trim(timestampNanos);
+
+            CombatLog.trace(
+                    "ViewerTrackingManager",
+                    "applyMovement",
+                    "Movement recorded"
+                            + " | Observer=" + observerId
+                            + " | Target=" + targetId
+                            + " | Sequence=" + sequence
+                            + " | Packet=" + packet.getClass().getSimpleName()
+                            + " | PositionChanged=" + positionChanged
+                            + " | ActualTeleport=" + actualTeleport
+                            + " | Displacement="
+                            + Math.sqrt(displacementSquared)
+                            + " | PendingTeleport=" + teleportPending
+            );
 
             return true;
         }

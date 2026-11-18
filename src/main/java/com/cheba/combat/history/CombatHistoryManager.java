@@ -123,7 +123,7 @@ public final class CombatHistoryManager {
                             + " | HistorySize=" + history.size()
             );
         } else {
-            CombatLog.debug(
+            CombatLog.trace(
                     "CombatHistoryManager",
                     "recordSnapshot",
                     "Player=" + playerId

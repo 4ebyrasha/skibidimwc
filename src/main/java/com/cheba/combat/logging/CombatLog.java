@@ -24,8 +24,8 @@ import java.util.UUID;
 
 public final class CombatLog {
 
-    private static final Logger LOGGER =
-            LogManager.getLogger("MWC-Combat");
+    private static final Logger FALLBACK_LOGGER =
+            LogManager.getLogger("MWC-Combat-FileFallback");
 
     private static final Object FILE_LOCK = new Object();
 
@@ -35,14 +35,22 @@ public final class CombatLog {
     private static final Set<String> FAILED_SIDES =
             new HashSet<>();
 
-    private static final long MAX_FILE_SIZE =
-            8L * 1024L * 1024L;
+    // 63 MB (decimal). Each active or rotated file has this limit.
+    private static final long MAX_FILE_SIZE = 63_000_000L;
 
+    // Keep the active file plus three previous files.
     private static final int BACKUP_COUNT = 3;
+
+    // Avoid synchronous disk flush after every log line.
+    private static final int FLUSH_EVERY_LINES = 128;
+    private static final long FLUSH_INTERVAL_NANOS =
+            500_000_000L;
 
     private static volatile boolean infoEnabled = true;
     private static volatile boolean debugEnabled = true;
-    private static volatile boolean traceEnabled = true;
+
+    // Detailed tracing is opt-in: /mwclog trace
+    private static volatile boolean traceEnabled = false;
 
     private static volatile String sessionId =
             UUID.randomUUID().toString().substring(0, 8);
@@ -130,37 +138,8 @@ public final class CombatLog {
                 + safeComponent + "#" + safeMethod + "] "
                 + safeMessage;
 
-        switch (level) {
-            case "INFO":
-                LOGGER.info("[MWC Combat][{}#{}] {}",
-                        safeComponent, safeMethod, safeMessage);
-                break;
-
-            case "DEBUG":
-                LOGGER.debug("[MWC Combat][{}#{}] {}",
-                        safeComponent, safeMethod, safeMessage);
-                break;
-
-            case "TRACE":
-                LOGGER.trace("[MWC Combat][{}#{}] {}",
-                        safeComponent, safeMethod, safeMessage);
-                break;
-
-            case "WARN":
-                LOGGER.warn("[MWC Combat][{}#{}] {}",
-                        safeComponent, safeMethod, safeMessage);
-                break;
-
-            case "ERROR":
-                LOGGER.error("[MWC Combat][{}#{}] {}",
-                        safeComponent, safeMethod, safeMessage,
-                        throwable);
-                break;
-
-            default:
-                break;
-        }
-
+        // Combat messages go only to the dedicated MWC log.
+        // Do not mirror DEBUG/TRACE/INFO into latest.log.
         writeFile(line);
     }
 
@@ -182,7 +161,7 @@ public final class CombatLog {
                 return side.isClient() ? "client" : "server";
             }
         } catch (Exception exception) {
-            LOGGER.error(
+            FALLBACK_LOGGER.error(
                     "[MWC Combat] Could not determine effective side",
                     exception
             );
@@ -217,9 +196,16 @@ public final class CombatLog {
 
                 state.writer.write(line);
                 state.writer.newLine();
-                state.writer.flush();
 
                 state.sizeBytes += encoded.length;
+                state.pendingLines++;
+
+                long now = System.nanoTime();
+
+                if (state.pendingLines >= FLUSH_EVERY_LINES
+                        || now - state.lastFlushNanos >= FLUSH_INTERVAL_NANOS) {
+                    flushState(state, now);
+                }
 
             } catch (Exception exception) {
                 FAILED_SIDES.add(side);
@@ -230,9 +216,8 @@ public final class CombatLog {
                     closeQuietly(state.writer);
                 }
 
-                LOGGER.error(
-                        "[MWC Combat] File logging disabled for side="
-                                + side,
+                FALLBACK_LOGGER.error(
+                        "[MWC Combat] File logging disabled for side=" + side,
                         exception
                 );
             }
@@ -278,6 +263,7 @@ public final class CombatLog {
     private static void rotate(FileState state)
             throws IOException {
 
+        // Closing flushes the old active file before moving it.
         state.writer.close();
         state.writer = null;
 
@@ -310,6 +296,17 @@ public final class CombatLog {
         );
 
         state.sizeBytes = 0L;
+        state.pendingLines = 0;
+        state.lastFlushNanos = System.nanoTime();
+    }
+
+    private static void flushState(
+            FileState state,
+            long now
+    ) throws IOException {
+        state.writer.flush();
+        state.pendingLines = 0;
+        state.lastFlushNanos = now;
     }
 
     private static Path backupPath(Path file, int index) {
@@ -329,9 +326,43 @@ public final class CombatLog {
         }
     }
 
+    /**
+     * Flushes pending log lines without closing the active files.
+     */
+    public static void flush() {
+        synchronized (FILE_LOCK) {
+            long now = System.nanoTime();
+
+            for (Map.Entry<String, FileState> entry : FILES.entrySet()) {
+                try {
+                    flushState(entry.getValue(), now);
+                } catch (IOException exception) {
+                    FAILED_SIDES.add(entry.getKey());
+
+                    FALLBACK_LOGGER.error(
+                            "[MWC Combat] Could not flush log for side="
+                                    + entry.getKey(),
+                            exception
+                    );
+                }
+            }
+        }
+    }
+
     public static void close() {
         synchronized (FILE_LOCK) {
-            for (FileState state : FILES.values()) {
+            for (Map.Entry<String, FileState> entry : FILES.entrySet()) {
+                FileState state = entry.getValue();
+
+                try {
+                    flushState(state, System.nanoTime());
+                } catch (IOException exception) {
+                    FALLBACK_LOGGER.error(
+                            "[MWC Combat] Could not flush log during shutdown",
+                            exception
+                    );
+                }
+
                 closeQuietly(state.writer);
             }
 
@@ -410,6 +441,8 @@ public final class CombatLog {
         private BufferedWriter writer;
 
         private long sizeBytes;
+        private int pendingLines;
+        private long lastFlushNanos;
 
         private FileState(
                 Path path,
@@ -419,6 +452,8 @@ public final class CombatLog {
             this.path = path;
             this.writer = writer;
             this.sizeBytes = sizeBytes;
+            this.pendingLines = 0;
+            this.lastFlushNanos = System.nanoTime();
         }
     }
 }

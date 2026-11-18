@@ -2,6 +2,7 @@ package com.cheba.combat.mixin;
 
 import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
+import com.cheba.combat.tracking.ViewerTrackingManager;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.NetHandlerPlayServer;
 import net.minecraft.network.play.client.CPacketPlayer;
@@ -118,6 +119,15 @@ public abstract class NetHandlerPlayServerMixin {
         if (player == null) {
             return;
         }
+
+        ViewerTrackingManager.markTeleportTarget(
+                player.getUniqueID()
+        );
+
+        CombatHistoryManager.invalidate(
+                player.getUniqueID(),
+                "server_position_correction"
+        );
 
         CombatHistoryManager.invalidate(
                 player.getUniqueID(),
