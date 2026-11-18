@@ -110,7 +110,7 @@ public final class MWC {
     @Mod.EventHandler
     public void init(FMLInitializationEvent initializationEvent) {
 
-        //CombatLog.setTraceEnabled(true);
+        CombatLog.setTraceEnabled(true);
 
         MinecraftForge.EVENT_BUS.register(CommonEventHandler.class);
         MinecraftForge.EVENT_BUS.register(CombatHistoryEventHandler.class);
