@@ -757,6 +757,16 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     );
 
             if (!isValidHistoricalState(player, serverState)) {
+                CombatLog.trace(
+                        "EntityProjectile",
+                        "getViewerOffset",
+                        "Viewer correction unavailable"
+                                + " | Projectile=" + getUniqueID()
+                                + " | Shooter=" + shooter.getUniqueID()
+                                + " | Target=" + player.getUniqueID()
+                                + " | Reason=INVALID_HISTORICAL_STATE"
+                );
+
                 return Vec3d.ZERO;
             }
 
@@ -782,7 +792,30 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 return Vec3d.ZERO;
             }
 
-            return new Vec3d(offsetX, offsetY, offsetZ);
+            Vec3d offset = new Vec3d(
+                    offsetX,
+                    offsetY,
+                    offsetZ
+            );
+
+            CombatLog.trace(
+                    "EntityProjectile",
+                    "getViewerOffset",
+                    "Viewer correction applied"
+                            + " | Projectile=" + getUniqueID()
+                            + " | Shooter=" + shooter.getUniqueID()
+                            + " | Target=" + player.getUniqueID()
+                            + " | ShotTimestamp=" + shotTimestampNanos
+                            + " | SegmentStart=" + segmentStartNanos
+                            + " | SnapshotTimestamp=" + latest.getTimestampNanos()
+                            + " | OffsetX=" + offsetX
+                            + " | OffsetY=" + offsetY
+                            + " | OffsetZ=" + offsetZ
+                            + " | OffsetLength="
+                            + Math.sqrt(offset.lengthSquared())
+            );
+
+            return offset;
         }
 
         return Vec3d.ZERO;
@@ -915,28 +948,18 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                     "EntityProjectile",
                     "findHistoricalPlayerIntersection",
                     "Historical boundary snapshot unavailable"
-                            + " | Projectile=" + getEntityId()
+                            + " | Projectile=" + getUniqueID()
                             + " | Target=" + player.getUniqueID()
                             + " | StartReason=" + startReason
                             + " | EndReason=" + endReason
+                            + " | SegmentStart=" + segmentStartNanos
+                            + " | SegmentEnd=" + segmentEndNanos
                             + " | Midpoint=" + midpointNanos
             );
-        }
 
-        /*
-         * Both segment boundaries must have valid historical states.
-         * A midpoint-only hitbox cannot reliably represent a moving target
-         * across the entire projectile segment.
-         */
-        if (!isValidHistoricalState(player, startState)
-                || !isValidHistoricalState(player, endState)) {
             return null;
         }
 
-        /*
-         * The same positional offset is applied to both historical
-         * boundaries. Target movement remains server-authoritative.
-         */
         Vec3d targetMotion = new Vec3d(
                 endState.getX() - startState.getX(),
                 endState.getY() - startState.getY(),
@@ -972,12 +995,46 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 Math.max(startBox.maxZ, relativeEndBox.maxZ)
         ).grow(0.15D);
 
+        /*
+         * Transform the projectile segment into target-relative space.
+         * The historical target trajectory is stationary in that space.
+         */
         Vec3d relativeEnd = end.subtract(targetMotion);
 
         RayTraceResult relativeHit =
                 sweptBox.calculateIntercept(start, relativeEnd);
 
+        String weaponName = this instanceof WeaponSpawnEntity
+                && ((WeaponSpawnEntity) this).getWeapon() != null
+                ? ((WeaponSpawnEntity) this).getWeapon().getName()
+                : "unknown";
+
+        long shotTimestamp = this instanceof WeaponSpawnEntity
+                ? ((WeaponSpawnEntity) this).getServerShotTimestampNanos()
+                : CombatClockSyncManager.NO_ESTIMATE;
+
         if (relativeHit == null || relativeHit.hitVec == null) {
+            CombatLog.trace(
+                    "EntityProjectile",
+                    "findHistoricalPlayerIntersection",
+                    "Historical collision miss"
+                            + " | Projectile=" + getUniqueID()
+                            + " | Weapon=" + weaponName
+                            + " | ShotTimestamp=" + shotTimestamp
+                            + " | Shooter="
+                            + (getThrower() == null
+                            ? "null"
+                            : getThrower().getUniqueID())
+                            + " | Target=" + player.getUniqueID()
+                            + " | SegmentStart=" + segmentStartNanos
+                            + " | SegmentEnd=" + segmentEndNanos
+                            + " | ProjectileStart=" + start
+                            + " | ProjectileEnd=" + end
+                            + " | TargetMotion=" + targetMotion
+                            + " | ViewerOffset=" + viewerOffset
+                            + " | Collision=MISS"
+            );
+
             return null;
         }
 
@@ -994,11 +1051,41 @@ public abstract class EntityProjectile extends Entity implements IProjectile, IE
                 / relativeLengthSquared;
 
         if (progress < 0.0D || progress > 1.0D) {
+            CombatLog.trace(
+                    "EntityProjectile",
+                    "findHistoricalPlayerIntersection",
+                    "Historical intersection rejected"
+                            + " | Projectile=" + getUniqueID()
+                            + " | Target=" + player.getUniqueID()
+                            + " | Progress=" + progress
+                            + " | Collision=OUT_OF_SEGMENT"
+            );
+
             return null;
         }
 
         Vec3d worldHit = start.add(
                 end.subtract(start).scale(progress)
+        );
+
+        CombatLog.trace(
+                "EntityProjectile",
+                "findHistoricalPlayerIntersection",
+                "Historical collision hit"
+                        + " | Projectile=" + getUniqueID()
+                        + " | Weapon=" + weaponName
+                        + " | ShotTimestamp=" + shotTimestamp
+                        + " | Shooter="
+                        + (getThrower() == null
+                        ? "null"
+                        : getThrower().getUniqueID())
+                        + " | Target=" + player.getUniqueID()
+                        + " | SegmentStart=" + segmentStartNanos
+                        + " | SegmentEnd=" + segmentEndNanos
+                        + " | Progress=" + progress
+                        + " | HitPosition=" + worldHit
+                        + " | ViewerOffset=" + viewerOffset
+                        + " | Collision=HIT"
         );
 
         return new RayTraceResult(player, worldHit);

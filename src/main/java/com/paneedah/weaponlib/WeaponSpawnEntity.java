@@ -1,7 +1,6 @@
 package com.paneedah.weaponlib;
 
 import com.cheba.combat.logging.CombatLog;
-import com.paneedah.mwc.ProjectConstants;
 import com.paneedah.mwc.network.messages.BloodClientMessage;
 import com.paneedah.mwc.network.messages.CrackSoundMessage;
 import com.paneedah.mwc.utils.HitUtil;
@@ -150,6 +149,24 @@ public class WeaponSpawnEntity extends EntityProjectile {
         if (isDead
                 && entityImpactPosition == null
                 && blockImpactPosition == null) {
+
+            CombatLog.debug(
+                    "WeaponSpawnEntity",
+                    "onUpdate",
+                    "Projectile ended without impact"
+                            + " | Projectile=" + getUniqueID()
+                            + " | EntityId=" + getEntityId()
+                            + " | Shooter="
+                            + (getThrower() == null
+                            ? "null"
+                            : getThrower().getUniqueID())
+                            + " | Weapon="
+                            + (weapon == null ? "unknown" : weapon.getName())
+                            + " | ShotTimestamp=" + getServerShotTimestampNanos()
+                            + " | TicksExisted=" + ticksExisted
+                            + " | Collision=NONE"
+            );
+
             return;
         }
 
@@ -420,6 +437,7 @@ public class WeaponSpawnEntity extends EntityProjectile {
                     "onImpact",
                     "Projectile damage processed"
                             + " | Projectile=" + getUniqueID()
+                            + " | ShotTimestamp=" + getServerShotTimestampNanos()
                             + " | Shooter=" + (getThrower() == null
                             ? "null"
                             : getThrower().getUniqueID())
@@ -435,7 +453,15 @@ public class WeaponSpawnEntity extends EntityProjectile {
             position.entityHit.hurtResistantTime = 0;
             position.entityHit.prevRotationYaw -= 0.3F;
 
-            ProjectConstants.LOGGER.debug("Hit entity {}", position.entityHit);
+            CombatLog.debug(
+                    "WeaponSpawnEntity",
+                    "onImpact",
+                    "Entity impact processed"
+                            + " | Target=" + position.entityHit.getUniqueID()
+                            + " | TargetEntityId=" + position.entityHit.getEntityId()
+                            + " | Weapon=" + (weapon == null ? "unknown" : weapon.getName())
+                            + " | ShotTimestamp=" + getServerShotTimestampNanos()
+            );
 
             NetworkRegistry.TargetPoint point = new NetworkRegistry.TargetPoint(
                     position.entityHit.dimension,

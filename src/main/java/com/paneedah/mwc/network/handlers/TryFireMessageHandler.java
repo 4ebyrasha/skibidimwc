@@ -145,8 +145,8 @@ public final class TryFireMessageHandler
                     )
             );
 
-            float shotYaw = player.rotationYaw;
-            float shotPitch = player.rotationPitch;
+            float shotYaw = Float.NaN;
+            float shotPitch = Float.NaN;
             boolean acceptedClientDirection = false;
 
             if (message.hasShotDirection()) {

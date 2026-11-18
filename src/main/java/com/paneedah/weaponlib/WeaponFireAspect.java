@@ -1,6 +1,8 @@
 package com.paneedah.weaponlib;
 
 import com.cheba.combat.client.ClientRenderedPlayerHistory;
+import com.cheba.combat.fire.ShotDirectionResolver;
+import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.combat.tracking.ViewerSnapshotValidator;
 import com.paneedah.mwc.instancing.PlayerWeaponInstance;
@@ -900,10 +902,12 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         }
 
         if (spawnEntityWith == null) {
-            LOGGER.error(
-                    "[MWC Combat][WeaponFireAspect#serverFire] "
-                            + "Projectile factory is unavailable | Weapon={}",
-                    weapon.getName()
+            CombatLog.error(
+                    "WeaponFireAspect",
+                    "serverFire",
+                    "Projectile factory unavailable"
+                            + " | Weapon=" + weapon.getName(),
+                    null
             );
             return;
         }
@@ -911,7 +915,13 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         int currentServerAmmo = Tags.getAmmo(itemStack);
 
         if (currentServerAmmo <= 0) {
-            LOGGER.error("No server ammo");
+            CombatLog.debug(
+                    "WeaponFireAspect",
+                    "serverFire",
+                    "Shot rejected: server ammunition is empty"
+                            + " | Player=" + player.getUniqueID()
+                            + " | Weapon=" + weapon.getName()
+            );
             return;
         }
 
@@ -959,17 +969,23 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                             ? -1L
                             : serverReceiveTimestampNanos - previousServerTimestamp;
 
-            LOGGER.info(
-                    "[GunshotTiming][SERVER] shooter={} clientShotDtMs={} serverReceiveDtMs={} serverShotAgeMs={}",
-                    shooterId,
-                    formatTimingInterval(clientInterval),
-                    formatTimingInterval(serverReceiveInterval),
-                    serverShotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE
+            CombatLog.info(
+                    "WeaponFireAspect",
+                    "serverFire",
+                    "Gunshot timing"
+                            + " | Shooter=" + shooterId
+                            + " | ClientShotDtMs="
+                            + formatTimingInterval(clientInterval)
+                            + " | ServerReceiveDtMs="
+                            + formatTimingInterval(serverReceiveInterval)
+                            + " | ServerShotAgeMs="
+                            + (serverShotTimestampNanos
+                            != CombatClockSyncManager.NO_ESTIMATE
                             ? formatTimingInterval(
                             serverReceiveTimestampNanos
                                     - serverShotTimestampNanos
                     )
-                            : "unavailable"
+                            : "unavailable")
             );
         }
 
@@ -1022,31 +1038,31 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
         );
 
         /*
-         * Never use client-submitted rotation as the authoritative
-         * projectile direction.
-         *
-         * Start with the latest rotation accepted by the server.
-         * Historical shooter state below replaces it when available.
+         * Preserve the original client direction for validation.
+         * The server-side historical rotation remains the authority.
          */
-        shotYaw = player.rotationYaw;
-        shotPitch = player.rotationPitch;
+        final float clientShotYaw = shotYaw;
+        final float clientShotPitch = shotPitch;
+
+        final float currentServerYaw = player.rotationYaw;
+        final float currentServerPitch = player.rotationPitch;
+
+        float authoritativeShotYaw = currentServerYaw;
+        float authoritativeShotPitch = currentServerPitch;
 
         boolean historicalOriginAvailable = false;
 
         /*
          * This is the timestamp used by EntityProjectile to map each
          * physical projectile segment onto the target history timeline.
-         *
-         * - Historical origin: original translated shot timestamp.
-         * - Current origin fallback: timestamp captured with current origin.
-         * - Non-player shooters or unavailable shot timestamp: disabled.
          */
         long projectileTimelineTimestampNanos =
                 CombatClockSyncManager.NO_ESTIMATE;
 
         boolean historicalTimelineEligible =
                 player instanceof EntityPlayerMP
-                        && serverShotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE;
+                        && serverShotTimestampNanos
+                        != CombatClockSyncManager.NO_ESTIMATE;
 
         if (historicalTimelineEligible) {
             EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
@@ -1066,40 +1082,95 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                         shooterState.getY() + shooterState.getEyeHeight(),
                         shooterState.getZ()
                 );
-                shotYaw = shooterState.getYaw();
-                shotPitch = shooterState.getPitch();
+
+                authoritativeShotYaw = shooterState.getYaw();
+                authoritativeShotPitch = shooterState.getPitch();
 
                 historicalOriginAvailable = true;
+
                 projectileTimelineTimestampNanos =
                         serverShotTimestampNanos;
 
             } else {
                 /*
-                 * The old shot timestamp cannot describe the current origin.
-                 * Anchor the projectile timeline to the current origin instead.
+                 * The historical shooter origin cannot be reconstructed.
+                 * Keep the current origin and anchor the projectile timeline
+                 * to the timestamp captured together with that origin.
                  */
                 projectileTimelineTimestampNanos =
                         currentOriginTimestampNanos;
 
-                LOGGER.debug(
-                        "[MWC Combat][WeaponFireAspect#serverFire] "
-                                + "Historical shooter origin unavailable; "
-                                + "using current origin with independent timeline "
-                                + "| Player={} | ShotTimestamp={} | "
-                                + "CurrentOriginTimestamp={} | StateAvailable={} | "
-                                + "StateEntityId={} | ExpectedEntityId={} | "
-                                + "StateDimension={} | CurrentDimension={}",
-                        serverPlayer.getUniqueID(),
-                        serverShotTimestampNanos,
-                        currentOriginTimestampNanos,
-                        shooterState != null,
-                        shooterState == null ? -1 : shooterState.getEntityId(),
-                        serverPlayer.getEntityId(),
-                        shooterState == null ? -1 : shooterState.getDimension(),
-                        serverPlayer.dimension
+                CombatLog.debug(
+                        "WeaponFireAspect",
+                        "serverFire",
+                        "Historical shooter origin unavailable"
+                                + " | Player=" + serverPlayer.getUniqueID()
+                                + " | ShotTimestamp=" + serverShotTimestampNanos
+                                + " | CurrentOriginTimestamp="
+                                + currentOriginTimestampNanos
+                                + " | StateAvailable=" + (shooterState != null)
+                                + " | StateEntityId="
+                                + (shooterState == null
+                                ? -1
+                                : shooterState.getEntityId())
+                                + " | ExpectedEntityId="
+                                + serverPlayer.getEntityId()
+                                + " | StateDimension="
+                                + (shooterState == null
+                                ? -1
+                                : shooterState.getDimension())
+                                + " | CurrentDimension="
+                                + serverPlayer.dimension
                 );
             }
         }
+
+        /*
+         * Use the client direction only when it remains very close
+         * to the server-accepted direction at the shot timestamp.
+         */
+        ShotDirectionResolver.Result resolvedDirection =
+                ShotDirectionResolver.resolve(
+                        clientShotYaw,
+                        clientShotPitch,
+                        authoritativeShotYaw,
+                        authoritativeShotPitch
+                );
+
+        if (!resolvedDirection.isValid()) {
+            CombatLog.error(
+                    "WeaponFireAspect",
+                    "serverFire",
+                    "Shot rejected because the authoritative direction is invalid"
+                            + " | Player=" + player.getUniqueID()
+                            + " | ServerYaw=" + authoritativeShotYaw
+                            + " | ServerPitch=" + authoritativeShotPitch,
+                    null
+            );
+            return;
+        }
+
+        shotYaw = resolvedDirection.getYaw();
+        shotPitch = resolvedDirection.getPitch();
+
+        CombatLog.debug(
+                "WeaponFireAspect",
+                "serverFire",
+                "Shot direction resolved"
+                        + " | Player=" + player.getUniqueID()
+                        + " | HistoricalOrigin=" + historicalOriginAvailable
+                        + " | ClientYaw=" + clientShotYaw
+                        + " | ClientPitch=" + clientShotPitch
+                        + " | ServerYaw=" + authoritativeShotYaw
+                        + " | ServerPitch=" + authoritativeShotPitch
+                        + " | AppliedYaw=" + shotYaw
+                        + " | AppliedPitch=" + shotPitch
+                        + " | AngularErrorDegrees="
+                        + resolvedDirection.getAngularErrorDegrees()
+                        + " | ClientDirectionAccepted="
+                        + resolvedDirection.isClientDirectionAccepted()
+                        + " | Reason=" + resolvedDirection.getReason()
+        );
 
         /*
          * Catch-up is valid only when both the historical origin and the
@@ -1141,12 +1212,14 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             WeaponSpawnEntity bullet = spawnEntityWith.apply(weapon, player);
 
             if (bullet == null) {
-                LOGGER.error(
-                        "[MWC Combat][WeaponFireAspect#serverFire] "
-                                + "Projectile factory returned null | Weapon={} | Pellet={}/{}",
-                        weapon.getName(),
-                        i + 1,
-                        weapon.builder.pellets
+                CombatLog.error(
+                        "WeaponFireAspect",
+                        "serverFire",
+                        "Projectile factory returned null"
+                                + " | Weapon=" + weapon.getName()
+                                + " | Pellet=" + (i + 1)
+                                + "/" + weapon.builder.pellets,
+                        null
                 );
                 continue;
             }
@@ -1193,12 +1266,14 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
              * Collision and damage must only happen for a world entity.
              */
             if (!player.world.spawnEntity(bullet)) {
-                LOGGER.warn(
-                        "[MWC Combat][WeaponFireAspect#serverFire] "
-                                + "Projectile spawn rejected | Player={} | Pellet={}/{}",
-                        player.getUniqueID(),
-                        i + 1,
-                        weapon.builder.pellets
+                CombatLog.warn(
+                        "WeaponFireAspect",
+                        "serverFire",
+                        "Projectile spawn rejected"
+                                + " | Player=" + player.getUniqueID()
+                                + " | Weapon=" + weapon.getName()
+                                + " | Pellet=" + (i + 1)
+                                + "/" + weapon.builder.pellets
                 );
                 continue;
             }
@@ -1209,20 +1284,20 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 bullet.onUpdate();
             }
 
-            LOGGER.debug(
-                    "[MWC Combat][WeaponFireAspect#serverFire] "
-                            + "Projectile catch-up completed | "
-                            + "Player={} | Pellet={}/{} | "
-                            + "HistoricalOrigin={} | TimelineTimestamp={} | "
-                            + "CatchUpTicks={} | ShotAgeMs={} | Dead={}",
-                    player.getUniqueID(),
-                    i + 1,
-                    weapon.builder.pellets,
-                    historicalOriginAvailable,
-                    projectileTimelineTimestampNanos,
-                    catchUpTicks,
-                    projectileAgeNanos / 1_000_000.0D,
-                    bullet.isDead
+            CombatLog.debug(
+                    "WeaponFireAspect",
+                    "serverFire",
+                    "Projectile catch-up completed"
+                            + " | Player=" + player.getUniqueID()
+                            + " | Pellet=" + (i + 1)
+                            + "/" + weapon.builder.pellets
+                            + " | HistoricalOrigin=" + historicalOriginAvailable
+                            + " | TimelineTimestamp="
+                            + projectileTimelineTimestampNanos
+                            + " | CatchUpTicks=" + catchUpTicks
+                            + " | ShotAgeMs="
+                            + projectileAgeNanos / 1_000_000.0D
+                            + " | Dead=" + bullet.isDead
             );
         }
 
