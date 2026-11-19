@@ -22,7 +22,7 @@ public class NGSWRFactory implements GunFactory {
 
                 .withName("ngsw_r")
                 //.withAmmoCapacity(30)
-                .withFireRate(0.74f)
+                .withFireRate(0.75f)
                 .withRecoil(2.5f)
                 .withZoom(0.9f)
                 .withConfigGroup(GunConfigurationGroup.RIFLE)
