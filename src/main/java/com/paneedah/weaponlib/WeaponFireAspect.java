@@ -2,6 +2,7 @@ package com.paneedah.weaponlib;
 
 import com.cheba.combat.client.ClientRenderedPlayerHistory;
 import com.cheba.combat.fire.ShotDirectionResolver;
+import com.cheba.combat.history.PlayerSnapshot;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.combat.tracking.ViewerSnapshotValidator;
@@ -1029,33 +1030,63 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
          * be reconstructed. It must never be paired with the old client
          * shot timestamp.
          */
+
         final long currentOriginTimestampNanos = System.nanoTime();
 
-        Vec3d projectileOrigin = new Vec3d(
+        /*
+         * Capture the current authoritative shooter state.
+         *
+         * This snapshot is a temporary interpolation endpoint.
+         * It is never inserted into persistent player history.
+         */
+        PlayerSnapshot liveShooterEndpoint = null;
+
+        if (player instanceof EntityPlayerMP) {
+            try {
+                liveShooterEndpoint = new PlayerSnapshot(
+                        (EntityPlayerMP) player,
+                        currentOriginTimestampNanos
+                );
+            } catch (IllegalArgumentException exception) {
+                CombatLog.warn(
+                        "WeaponFireAspect",
+                        "serverFire",
+                        "Live shooter endpoint unavailable"
+                                + " | Player=" + player.getUniqueID()
+                                + " | Reason=" + exception.getMessage()
+                );
+            }
+        }
+
+        Vec3d projectileOrigin = liveShooterEndpoint != null
+                ? new Vec3d(
+                liveShooterEndpoint.getX(),
+                liveShooterEndpoint.getY()
+                        + liveShooterEndpoint.getEyeHeight(),
+                liveShooterEndpoint.getZ()
+        )
+                : new Vec3d(
                 player.posX,
                 player.posY + player.getEyeHeight(),
                 player.posZ
         );
 
-        /*
-         * Preserve the original client direction for validation.
-         * The server-side historical rotation remains the authority.
-         */
         final float clientShotYaw = shotYaw;
         final float clientShotPitch = shotPitch;
 
-        final float currentServerYaw = player.rotationYaw;
-        final float currentServerPitch = player.rotationPitch;
+        final float currentServerYaw = liveShooterEndpoint != null
+                ? liveShooterEndpoint.getYaw()
+                : player.rotationYaw;
+
+        final float currentServerPitch = liveShooterEndpoint != null
+                ? liveShooterEndpoint.getPitch()
+                : player.rotationPitch;
 
         float authoritativeShotYaw = currentServerYaw;
         float authoritativeShotPitch = currentServerPitch;
 
         boolean historicalOriginAvailable = false;
 
-        /*
-         * This is the timestamp used by EntityProjectile to map each
-         * physical projectile segment onto the target history timeline.
-         */
         long projectileTimelineTimestampNanos =
                 CombatClockSyncManager.NO_ESTIMATE;
 
@@ -1070,7 +1101,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             HistoricalPlayerState shooterState =
                     CombatHistoryManager.getHistoricalState(
                             serverPlayer.getUniqueID(),
-                            serverShotTimestampNanos
+                            serverShotTimestampNanos,
+                            liveShooterEndpoint
                     );
 
             if (shooterState != null
@@ -1092,13 +1124,20 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                         serverShotTimestampNanos;
 
             } else {
-                /*
-                 * The historical shooter origin cannot be reconstructed.
-                 * Keep the current origin and anchor the projectile timeline
-                 * to the timestamp captured together with that origin.
-                 */
                 projectileTimelineTimestampNanos =
                         currentOriginTimestampNanos;
+
+                String historyFailureReason =
+                        liveShooterEndpoint == null
+                                ? CombatHistoryManager.getHistoricalStateFailureReason(
+                                serverPlayer.getUniqueID(),
+                                serverShotTimestampNanos
+                        )
+                                : CombatHistoryManager.getHistoricalStateFailureReason(
+                                serverPlayer.getUniqueID(),
+                                serverShotTimestampNanos,
+                                liveShooterEndpoint
+                        );
 
                 CombatLog.debug(
                         "WeaponFireAspect",
@@ -1108,22 +1147,28 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                                 + " | ShotTimestamp=" + serverShotTimestampNanos
                                 + " | CurrentOriginTimestamp="
                                 + currentOriginTimestampNanos
-                                + " | StateAvailable=" + (shooterState != null)
+                                + " | HistoryFailureReason="
+                                + historyFailureReason
+                                + " | LiveEndpointAvailable="
+                                + (liveShooterEndpoint != null)
+                                + " | StateAvailable="
+                                + (shooterState != null)
+                                + " | ExpectedEntityId="
+                                + serverPlayer.getEntityId()
                                 + " | StateEntityId="
                                 + (shooterState == null
                                 ? -1
                                 : shooterState.getEntityId())
-                                + " | ExpectedEntityId="
-                                + serverPlayer.getEntityId()
+                                + " | CurrentDimension="
+                                + serverPlayer.dimension
                                 + " | StateDimension="
                                 + (shooterState == null
                                 ? -1
                                 : shooterState.getDimension())
-                                + " | CurrentDimension="
-                                + serverPlayer.dimension
                 );
             }
         }
+
 
         /*
          * Use the client direction only when it remains very close

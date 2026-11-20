@@ -294,12 +294,23 @@ public final class ViewerTrackingManager {
             ));
         }
 
+
+
         private boolean applyMovement(
                 Packet<?> packet,
                 EntityPlayerMP target,
                 long timestampNanos
         ) {
             if (packet == null || target == null) {
+                return false;
+            }
+
+            boolean positionChanged =
+                    packet instanceof SPacketEntityTeleport
+                            || packet instanceof SPacketEntity.S15PacketEntityRelMove
+                            || packet instanceof SPacketEntity.S17PacketEntityLookMove;
+
+            if (!positionChanged) {
                 return false;
             }
 
@@ -314,27 +325,9 @@ public final class ViewerTrackingManager {
                 return false;
             }
 
-            boolean positionChanged =
-                    packet instanceof SPacketEntityTeleport
-                            || packet instanceof SPacketEntity.S15PacketEntityRelMove
-                            || packet instanceof SPacketEntity.S17PacketEntityLookMove;
-
-            if (!positionChanged
-                    && !(packet instanceof SPacketEntity.S16PacketEntityLook)) {
-                return false;
-            }
-
-            double nextX = positionChanged
-                    ? quantizePosition(target.posX)
-                    : x;
-
-            double nextY = positionChanged
-                    ? quantizePosition(target.posY)
-                    : y;
-
-            double nextZ = positionChanged
-                    ? quantizePosition(target.posZ)
-                    : z;
+            double nextX = quantizePosition(target.posX);
+            double nextY = quantizePosition(target.posY);
+            double nextZ = quantizePosition(target.posZ);
 
             double dx = nextX - x;
             double dy = nextY - y;
@@ -346,27 +339,17 @@ public final class ViewerTrackingManager {
             boolean fullTeleportPacket =
                     packet instanceof SPacketEntityTeleport;
 
-            /*
-             * A full teleport packet alone is not proof of an actual teleport.
-             * Small full-position updates can be normal vanilla synchronization.
-             *
-             * Explicit server corrections are marked through
-             * NetHandlerPlayServerMixin.
-             */
-            boolean actualTeleport = positionChanged
-                    && (teleportPending
+            boolean actualTeleport = teleportPending
                     || (fullTeleportPacket
                     && displacementSquared
                     > FORCED_TELEPORT_DISPLACEMENT
-                    * FORCED_TELEPORT_DISPLACEMENT));
+                    * FORCED_TELEPORT_DISPLACEMENT);
 
-            if (positionChanged) {
-                x = nextX;
-                y = nextY;
-                z = nextZ;
+            x = nextX;
+            y = nextY;
+            z = nextZ;
 
-                teleportPending = false;
-            }
+            teleportPending = false;
 
             sequence++;
 
@@ -384,20 +367,19 @@ public final class ViewerTrackingManager {
             CombatLog.trace(
                     "ViewerTrackingManager",
                     "applyMovement",
-                    "Movement recorded"
+                    "Positional movement recorded"
                             + " | Observer=" + observerId
                             + " | Target=" + targetId
                             + " | Sequence=" + sequence
                             + " | Packet=" + packet.getClass().getSimpleName()
-                            + " | PositionChanged=" + positionChanged
-                            + " | ActualTeleport=" + actualTeleport
                             + " | Displacement="
                             + Math.sqrt(displacementSquared)
-                            + " | PendingTeleport=" + teleportPending
+                            + " | ActualTeleport=" + actualTeleport
             );
 
             return true;
         }
+
 
         private void trim(long now) {
             while (!sentStates.isEmpty()) {

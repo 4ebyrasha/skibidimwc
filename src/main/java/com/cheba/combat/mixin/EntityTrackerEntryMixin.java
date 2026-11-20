@@ -52,6 +52,7 @@ public abstract class EntityTrackerEntryMixin {
         }
     }
 
+
     @Inject(
             method = "sendPacketToTrackedPlayers",
             at = @At("RETURN")
@@ -65,7 +66,6 @@ public abstract class EntityTrackerEntryMixin {
         }
 
         if (!(packet instanceof SPacketEntity.S15PacketEntityRelMove)
-                && !(packet instanceof SPacketEntity.S16PacketEntityLook)
                 && !(packet instanceof SPacketEntity.S17PacketEntityLookMove)
                 && !(packet instanceof SPacketEntityTeleport)) {
             return;

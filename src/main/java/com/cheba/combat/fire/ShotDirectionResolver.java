@@ -1,8 +1,9 @@
+
 package com.cheba.combat.fire;
 
 public final class ShotDirectionResolver {
 
-    private static final double MAX_CLIENT_ANGLE_ERROR_DEGREES = 1.5D;
+    private static final double MAX_CLIENT_ANGLE_ERROR_DEGREES = 12.0D;
 
     private ShotDirectionResolver() {
     }
@@ -35,32 +36,53 @@ public final class ShotDirectionResolver {
             );
         }
 
-        double yawDifference = Math.abs(
-                wrapDegrees(clientYaw - serverYaw)
-        );
-
-        double pitchDifference = Math.abs(
-                clientPitch - serverPitch
-        );
-
-        double totalError = Math.hypot(
-                yawDifference,
-                pitchDifference
+        double angularError = calculateAngularError(
+                clientYaw,
+                clientPitch,
+                serverYaw,
+                serverPitch
         );
 
         boolean useClientDirection =
-                totalError <= MAX_CLIENT_ANGLE_ERROR_DEGREES;
+                angularError <= MAX_CLIENT_ANGLE_ERROR_DEGREES;
 
         return new Result(
                 useClientDirection ? clientYaw : serverYaw,
                 useClientDirection ? clientPitch : serverPitch,
                 useClientDirection,
                 true,
-                totalError,
+                angularError,
                 useClientDirection
                         ? "CLIENT_DIRECTION_WITHIN_TOLERANCE"
                         : "SERVER_DIRECTION_OUTSIDE_TOLERANCE"
         );
+    }
+
+    private static double calculateAngularError(
+            float firstYaw,
+            float firstPitch,
+            float secondYaw,
+            float secondPitch
+    ) {
+        double yawDifference = Math.toRadians(
+                wrapDegrees(firstYaw - secondYaw)
+        );
+
+        double firstPitchRad = Math.toRadians(firstPitch);
+        double secondPitchRad = Math.toRadians(secondPitch);
+
+        double dotProduct =
+                Math.sin(firstPitchRad) * Math.sin(secondPitchRad)
+                        + Math.cos(firstPitchRad)
+                        * Math.cos(secondPitchRad)
+                        * Math.cos(yawDifference);
+
+        dotProduct = Math.max(
+                -1.0D,
+                Math.min(1.0D, dotProduct)
+        );
+
+        return Math.toDegrees(Math.acos(dotProduct));
     }
 
     private static boolean isValid(float yaw, float pitch) {
@@ -70,13 +92,13 @@ public final class ShotDirectionResolver {
                 && pitch <= 90.0F;
     }
 
-    private static double wrapDegrees(double angle) {
-        angle %= 360.0D;
+    private static float wrapDegrees(float angle) {
+        angle %= 360.0F;
 
-        if (angle >= 180.0D) {
-            angle -= 360.0D;
-        } else if (angle < -180.0D) {
-            angle += 360.0D;
+        if (angle >= 180.0F) {
+            angle -= 360.0F;
+        } else if (angle < -180.0F) {
+            angle += 360.0F;
         }
 
         return angle;
@@ -86,8 +108,10 @@ public final class ShotDirectionResolver {
 
         private final float yaw;
         private final float pitch;
+
         private final boolean clientDirectionAccepted;
         private final boolean valid;
+
         private final double angularErrorDegrees;
         private final String reason;
 
