@@ -177,7 +177,6 @@ public class CommonModContext implements ModContext {
 
         CommonEventHandler serverHandler = new CommonEventHandler(this);
         MinecraftForge.EVENT_BUS.register(serverHandler);
-        MinecraftForge.EVENT_BUS.register(serverHandler);
 
         MinecraftForge.EVENT_BUS.register(new WeaponKeyInputHandler(this, this::getPlayer, weaponAttachmentAspect));
 

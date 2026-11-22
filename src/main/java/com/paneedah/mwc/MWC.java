@@ -90,7 +90,7 @@ public final class MWC {
     public void preInit(FMLPreInitializationEvent preInitializationEvent) {
         if (preInitializationEvent.getSide().isClient()) {
             MinecraftForge.EVENT_BUS.register(ClientEventHandler.class);
-            FMLCommonHandler.instance().bus().register(ClientEventHandler.class);
+            //FMLCommonHandler.instance().bus().register(ClientEventHandler.class);
             MinecraftForge.EVENT_BUS.register(new GuiHandler());
             MinecraftForge.EVENT_BUS.register(new Run());
             MinecraftForge.EVENT_BUS.register(new BulletSuppressionEffect());
@@ -102,7 +102,7 @@ public final class MWC {
         );
         KnockbackCapability.register();
         MinecraftForge.EVENT_BUS.register(KnockbackCapabilityHandler.class);
-        FMLCommonHandler.instance().bus().register(KnockbackCapabilityHandler.class);
+        //FMLCommonHandler.instance().bus().register(KnockbackCapabilityHandler.class); нужно ли оно вообще епт если есть minecraftforge event_bus сверху
 
         commonProxy.preInit(this);
     }
