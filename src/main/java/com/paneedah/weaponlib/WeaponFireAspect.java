@@ -42,8 +42,8 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import static com.paneedah.mwc.MWC.CHANNEL;
-import static com.paneedah.mwc.ProjectConstants.LOGGER;
 import static com.paneedah.mwc.proxies.ClientProxy.MC;
+
 import com.cheba.combat.client.ClientShotSnapshotCollector;
 import com.paneedah.mwc.network.messages.TryFireMessage.TargetSnapshots;
 import com.paneedah.mwc.network.messages.TryFireMessage.Snapshot;
@@ -53,7 +53,6 @@ import net.minecraft.client.audio.ISound;
 
 import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.history.HistoricalPlayerState;
-
 
 /*
  * On a client side this class is used from within
@@ -347,7 +346,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             }
 
             if (weaponInstance.getPlayer() instanceof EntityPlayer) {
-
                 weaponInstance.getPlayer().playSound(
                         modContext.getNoAmmoSound(),
                         1,
@@ -882,7 +880,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 shotYaw,
                 shotPitch,
                 serverShotTimestampNanos,
-                java.util.Collections.emptyList()
+                Collections.emptyList(),
+                System.nanoTime()
         );
     }
 
@@ -899,6 +898,43 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             long serverShotTimestampNanos,
             List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots
     ) {
+        serverFire(
+                player,
+                itemStack,
+                spawnEntityWith,
+                isBurst,
+                isAimed,
+                damageMultiplier,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch,
+                serverShotTimestampNanos,
+                viewerSnapshots,
+                System.nanoTime()
+        );
+    }
+
+    /*
+     * Main server firing implementation.
+     *
+     * The packet receive timestamp is passed from the packet handler,
+     * so the rate limiter uses actual server arrival time rather than
+     * the translated historical shot timestamp.
+     */
+    public void serverFire(
+            EntityLivingBase player,
+            ItemStack itemStack,
+            BiFunction<Weapon, EntityLivingBase, ? extends WeaponSpawnEntity> spawnEntityWith,
+            boolean isBurst,
+            boolean isAimed,
+            float damageMultiplier,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch,
+            long serverShotTimestampNanos,
+            List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots,
+            long serverPacketReceiveTimestampNanos
+    ) {
         if (player == null
                 || itemStack == null
                 || itemStack.isEmpty()
@@ -906,7 +942,11 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             return;
         }
 
-        if (player.world == null || player.world.isRemote || player.isDead) {
+        if (player.world == null
+                || player.world.isRemote
+                || !player.isEntityAlive()
+                || (player instanceof EntityPlayerMP
+                && CombatHistoryManager.isMarkedDead(player.getUniqueID()))) {
             return;
         }
 
@@ -914,7 +954,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             viewerSnapshots = Collections.emptyList();
         }
 
-        final long serverReceiveTimestampNanos = System.nanoTime();
+        final long serverReceiveTimestampNanos =
+                serverPacketReceiveTimestampNanos;
 
         Weapon weapon = (Weapon) itemStack.getItem();
 
@@ -956,10 +997,7 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
          * Empty-ammo requests must not consume the cooldown.
          */
         if (player instanceof EntityPlayerMP) {
-            long rateLimitTimestamp =
-                    serverShotTimestampNanos != CombatClockSyncManager.NO_ESTIMATE
-                            ? Math.min(serverShotTimestampNanos, serverReceiveTimestampNanos)
-                            : serverReceiveTimestampNanos;
+            long rateLimitTimestamp = serverReceiveTimestampNanos;
 
             if (!com.cheba.combat.fire.ServerFireRateLimiter.tryAccept(
                     (EntityPlayerMP) player,
@@ -1193,7 +1231,6 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 );
             }
         }
-
 
         /*
          * Use the client direction only when it remains very close
