@@ -582,9 +582,15 @@ public class WeaponSpawnEntity extends EntityProjectile {
     public static class ProjectileDamageSource extends EntityDamageSourceIndirect {
         private final String gunName;
 
-        public ProjectileDamageSource(String damageTypeIn, String gunName, Entity projectile, Entity shooter) {
+        public ProjectileDamageSource(
+                String damageTypeIn,
+                String gunName,
+                Entity projectile,
+                Entity shooter
+        ) {
             super(damageTypeIn, projectile, shooter);
             this.gunName = gunName;
+            this.setProjectile();
         }
 
         @Nonnull

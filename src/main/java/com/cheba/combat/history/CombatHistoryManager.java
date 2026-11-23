@@ -3,9 +3,7 @@ package com.cheba.combat.history;
 import com.cheba.combat.logging.CombatLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Central registry for server-authoritative player combat histories.
@@ -25,6 +23,7 @@ import java.util.UUID;
 public final class CombatHistoryManager {
 
     private static final Map<UUID, PlayerHistory> HISTORIES = new HashMap<>();
+    private static final Set<UUID> DEAD_PLAYERS = new HashSet<>();
 
     private CombatHistoryManager() {
     }
@@ -42,8 +41,11 @@ public final class CombatHistoryManager {
      * @param player server-side player whose state should be recorded
      */
     public static void recordSnapshot(EntityPlayerMP player) {
-        if (player == null || player.world == null || player.world.isRemote
-                || player.isDead) {
+        if (player == null
+                || player.world == null
+                || player.world.isRemote
+                || !player.isEntityAlive()
+                || isMarkedDead(player.getUniqueID())) {
             return;
         }
 
@@ -288,6 +290,28 @@ public final class CombatHistoryManager {
         }
     }
 
+    public static boolean markDead(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+
+        boolean firstDeath = DEAD_PLAYERS.add(playerId);
+
+        HISTORIES.remove(playerId);
+
+        return firstDeath;
+    }
+
+    public static boolean isMarkedDead(UUID playerId) {
+        return playerId != null && DEAD_PLAYERS.contains(playerId);
+    }
+
+    public static void clearDeathMarker(UUID playerId) {
+        if (playerId != null) {
+            DEAD_PLAYERS.remove(playerId);
+        }
+    }
+
     /**
      * Removes a player's history from the registry.
      *
@@ -316,6 +340,7 @@ public final class CombatHistoryManager {
         int removedHistories = HISTORIES.size();
 
         HISTORIES.clear();
+        DEAD_PLAYERS.clear();
 
         CombatLog.info(
                 "CombatHistoryManager",

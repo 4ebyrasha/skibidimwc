@@ -47,6 +47,9 @@ public final class ViewerSnapshotValidator {
         if (observer == null
                 || observer.world == null
                 || observer.world.isRemote
+                || !observer.isEntityAlive()
+                || CombatHistoryManager.isMarkedDead(
+                observer.getUniqueID())
                 || submitted == null
                 || submitted.isEmpty()
                 || serverShotTimestampNanos
@@ -109,7 +112,9 @@ public final class ViewerSnapshotValidator {
                 continue;
             }
 
-            if (target.isDead) {
+            if (!target.isEntityAlive()
+                    || CombatHistoryManager.isMarkedDead(
+                    target.getUniqueID())) {
                 reject(observer, targetData, "TARGET_IS_DEAD", "");
                 rejectedTargets++;
                 continue;

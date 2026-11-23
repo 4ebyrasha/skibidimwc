@@ -749,6 +749,30 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
             long serverShotTimestampNanos,
             List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots
     ) {
+        serverFire(
+                player,
+                isBurst,
+                isAimed,
+                clientShotTimestampNanos,
+                shotYaw,
+                shotPitch,
+                serverShotTimestampNanos,
+                viewerSnapshots,
+                System.nanoTime()
+        );
+    }
+
+    public void serverFire(
+            EntityLivingBase player,
+            boolean isBurst,
+            boolean isAimed,
+            long clientShotTimestampNanos,
+            float shotYaw,
+            float shotPitch,
+            long serverShotTimestampNanos,
+            List<ViewerSnapshotValidator.ValidatedTarget> viewerSnapshots,
+            long serverPacketReceiveTimestampNanos
+    ) {
         if (player == null) {
             return;
         }
@@ -764,7 +788,8 @@ public class WeaponFireAspect implements Aspect<WeaponState, PlayerWeaponInstanc
                 shotYaw,
                 shotPitch,
                 serverShotTimestampNanos,
-                viewerSnapshots
+                viewerSnapshots,
+                serverPacketReceiveTimestampNanos
         );
     }
 

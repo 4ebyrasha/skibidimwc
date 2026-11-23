@@ -11,6 +11,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
+import java.util.UUID;
+
 /**
  * Handles combat history recording and player lifecycle cleanup.
  */
@@ -68,21 +70,31 @@ public final class CombatHistoryEventHandler {
 
         EntityPlayerMP player = (EntityPlayerMP) event.getEntityLiving();
 
-        CombatHistoryManager.remove(player.getUniqueID());
+        UUID playerId = player.getUniqueID();
 
-        ViewerTrackingManager.stopTrackingObserver(
-                player.getUniqueID()
-        );
-        ViewerTrackingManager.stopTrackingTarget(
-                player.getUniqueID()
-        );
+        boolean firstDeath = CombatHistoryManager.markDead(playerId);
 
-        CombatLog.debug(
+        if (!firstDeath) {
+            CombatLog.debug(
+                    "CombatHistoryEventHandler",
+                    "onPlayerDeath",
+                    "Duplicate death event ignored"
+                            + " | Player=" + playerId
+                            + " | EntityId=" + player.getEntityId()
+            );
+            return;
+        }
+
+        ViewerTrackingManager.stopTrackingObserver(playerId);
+        ViewerTrackingManager.stopTrackingTarget(playerId);
+
+        CombatLog.info(
                 "CombatHistoryEventHandler",
                 "onPlayerDeath",
-                "Player combat history and tracking removed"
-                        + " | Player=" + player.getUniqueID()
+                "Player death registered"
+                        + " | Player=" + playerId
                         + " | EntityId=" + player.getEntityId()
+                        + " | Dimension=" + player.dimension
         );
     }
 
@@ -95,6 +107,9 @@ public final class CombatHistoryEventHandler {
         }
 
         EntityPlayerMP player = (EntityPlayerMP) event.player;
+        CombatHistoryManager.clearDeathMarker(
+                player.getUniqueID()
+        );
 
         /*
          * Death normally removes this state already.
@@ -135,6 +150,9 @@ public final class CombatHistoryEventHandler {
         }
 
         EntityPlayerMP player = (EntityPlayerMP) event.player;
+        CombatHistoryManager.clearDeathMarker(
+                player.getUniqueID()
+        );
 
         CombatHistoryManager.invalidate(
                 player.getUniqueID(),

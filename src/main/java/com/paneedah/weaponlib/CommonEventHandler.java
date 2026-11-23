@@ -211,17 +211,36 @@ public class CommonEventHandler {
     }
 
     @SubscribeEvent
-    // Todo: Fix this for the new equipment inventory
     protected void onLivingHurtEvent(LivingHurtEvent event) {
         final EntityLivingBase entityLiving = event.getEntityLiving();
-        final EquipmentInventory equipmentInventory = EquipmentCapability.getInventory(entityLiving);
 
-        if (equipmentInventory != null && equipmentInventory.getStackInSlot(1).getItem() != Items.AIR) {
-            final NonNullList<ItemStack> stackList = NonNullList.create();
-            final ItemStack[] itemStacks = new ItemStack[]{equipmentInventory.getStackInSlot(1)};
-            stackList.addAll(Arrays.asList(itemStacks));
-            event.setAmount((float) (event.getAmount() * (1 - ((ItemVest) equipmentInventory.getStackInSlot(1).getItem()).getDamageBlocked())));
+        final EquipmentInventory equipmentInventory =
+                EquipmentCapability.getInventory(entityLiving);
+
+        if (equipmentInventory == null) {
+            return;
         }
+
+        final ItemStack vestStack =
+                equipmentInventory.getStackInSlot(1);
+
+        if (vestStack.isEmpty()
+                || !(vestStack.getItem() instanceof ItemVest)) {
+            return;
+        }
+
+        double blocked =
+                ((ItemVest) vestStack.getItem()).getDamageBlocked();
+
+        if (!Double.isFinite(blocked)) {
+            return;
+        }
+
+        blocked = Math.max(0.0D, Math.min(1.0D, blocked));
+
+        event.setAmount(
+                (float) (event.getAmount() * (1.0D - blocked))
+        );
     }
 
     @SubscribeEvent

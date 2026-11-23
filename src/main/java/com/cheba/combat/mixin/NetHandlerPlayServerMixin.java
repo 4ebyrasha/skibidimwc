@@ -71,7 +71,11 @@ public abstract class NetHandlerPlayServerMixin {
             CPacketPlayer packetIn,
             CallbackInfo callbackInfo
     ) {
-        if (player == null || player.isDead || player.world == null) {
+        if (player == null
+                || player.world == null
+                || !player.isEntityAlive()
+                || CombatHistoryManager.isMarkedDead(
+                player.getUniqueID())) {
             CombatLog.warn(
                     "NetHandlerPlayServerMixin",
                     "recordAcceptedMovement",

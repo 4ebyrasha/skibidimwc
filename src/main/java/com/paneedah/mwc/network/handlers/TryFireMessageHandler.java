@@ -1,5 +1,6 @@
 package com.paneedah.mwc.network.handlers;
 
+import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.time.CombatClockSyncManager;
 import com.cheba.combat.tracking.ViewerSnapshotValidator;
@@ -80,13 +81,17 @@ public final class TryFireMessageHandler
                             + serverPacketReceiveNanos
             );
 
-            if (player.isDead || fireManager == null) {
+            if (!player.isEntityAlive()
+                    || CombatHistoryManager.isMarkedDead(playerId)
+                    || fireManager == null) {
                 CombatLog.debug(
                         "TryFireMessageHandler",
                         "onMessage",
                         "Fire request rejected"
                                 + " | Player=" + playerId
-                                + " | Dead=" + player.isDead
+                                + " | Dead=" + !player.isEntityAlive()
+                                + " | DeathMarker="
+                                + CombatHistoryManager.isMarkedDead(playerId)
                                 + " | FireManagerAvailable="
                                 + (fireManager != null)
                 );
@@ -226,7 +231,8 @@ public final class TryFireMessageHandler
                     shotYaw,
                     shotPitch,
                     serverShotTimestampNanos,
-                    viewerSnapshots
+                    viewerSnapshots,
+                    serverPacketReceiveNanos
             );
         });
 

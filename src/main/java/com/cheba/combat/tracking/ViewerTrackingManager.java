@@ -1,5 +1,6 @@
 package com.cheba.combat.tracking;
 
+import com.cheba.combat.history.CombatHistoryManager;
 import com.cheba.combat.logging.CombatLog;
 import com.cheba.combat.tracking.message.TrackingMarkerMessage;
 import com.paneedah.mwc.MWC;
@@ -228,8 +229,12 @@ public final class ViewerTrackingManager {
         return observer != null
                 && target != null
                 && observer != target
-                && !observer.isDead
-                && !target.isDead
+                && observer.isEntityAlive()
+                && target.isEntityAlive()
+                && !CombatHistoryManager.isMarkedDead(
+                observer.getUniqueID())
+                && !CombatHistoryManager.isMarkedDead(
+                target.getUniqueID())
                 && observer.world != null
                 && observer.world == target.world
                 && !observer.world.isRemote;
